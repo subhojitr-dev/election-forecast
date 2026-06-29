@@ -163,6 +163,7 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
   DATA_SETUP.md      every data file: full path, contents, source/DOI (all in data\raw\)
   PREP.md            election-night live-data readiness: per-state feeds + timeline + tests
   TESTING.md         plain-language test guide: what to click, what you should see, pass/fail
+  DEPLOY.md          Phase 7 deploy plan: frontend→Vercel, backend→Render/Fly, caching
   PROGRESS.md        chronological work log (newest on top)
   Issues.md          problems, workarounds, November readiness plan
   requirements.txt   Python deps
