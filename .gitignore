@@ -1,0 +1,25 @@
+# --- Large / regenerable DATA (1.4 GB) — never commit; see DATA_SETUP.md to obtain ---
+*.csv
+data/db/
+*.db
+*.db-wal
+*.db-shm
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# --- Node / Vite (frontend) ---
+ui/node_modules/
+ui/dist/
+node_modules/
+
+# --- OS / editor / logs ---
+.DS_Store
+Thumbs.db
+*.log

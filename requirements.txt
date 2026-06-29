@@ -1,0 +1,12 @@
+# Election Forecast Dashboard — Python dependencies
+# Install:  pip install -r requirements.txt
+
+pandas        # ETL (Phase 1) — read CSVs, aggregate, load SQLite
+clarify       # Phase 2 — parse Clarity ENR XML feeds (pulls in lxml, requests)
+requests      # Phase 2 — HTTP client for live feed fetching
+
+fastapi       # Phase 4 — REST API + WebSocket
+uvicorn       # Phase 4 — ASGI server
+
+# Planned for later phases (not yet used):
+# apscheduler  # optional — alt scheduler for 60s polling (we use a simple loop)
