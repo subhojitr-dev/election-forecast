@@ -11,6 +11,7 @@ COPY . .
 
 ENV PORT=8000
 EXPOSE 8000
+# entrypoint.sh downloads baseline.db (from DB_URL) on boot, then starts uvicorn.
 # Single worker keeps the in-memory SimController + SQLite consistent. For higher
 # load, move to Postgres + multiple workers (DEPLOY.md §3).
-CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "entrypoint.sh"]
