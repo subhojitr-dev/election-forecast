@@ -5,6 +5,27 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-06-28 — Issue #7 fixed · Phase-7 deploy wiring · feed audit (round 1) · pushed to GitHub
+
+- **Issue #7 RESOLVED** — `etl_ga_runoff_2021.py` now estimate-fills the 4 counties
+  OpenElections omits (Camden/Chattooga/Grady/Greene): each split by its real 2020
+  Senate lean + size, scaled so the missing sum = (certified − loaded). All **159**
+  counties present; GA Senate statewide now EXACTLY certified (Ossoff 50.61% /
+  Warnock 51.04%). Integration test still PASS.
+- **Phase-7 deploy wiring** (see DEPLOY.md) — `Dockerfile` + `.dockerignore` (backend on
+  Render/Fly); CORS now env-driven (`CORS_ORIGINS`, default `*`); `Cache-Control` on
+  `/api/states` + `/api/state` (max-age=15, swr=30) — the scale lever; `ui/src/api.js`
+  uses `VITE_API_BASE` (relative in dev, absolute in prod). UI builds clean.
+- **Feed audit round 1** (desk research) → FEED_AUDIT.md. NC = best (live dashboard WITH
+  a by-voting-method tab); GA solid (statewide Clarity); PA/TX/MI = county-by-county
+  Clarity; AZ/NV = own statewide systems (confirm live mode); **WI = hardest (no
+  statewide feed — 72 county sites, AP-aggregated)**. Recommend pricing an **AP Elections
+  API** as a uniform primary source. Round 2 = test vs Jul/Aug primaries.
+- **Repo pushed** to github.com/subhojitr-dev/election-forecast (`main`); 1.4 GB of data
+  (CSVs + baseline.db) gitignored — see DATA_SETUP.md to rebuild.
+
+---
+
 ## 2026-06-28 — Election ballot manifest (date-aware race dropdown) + live-poller note
 
 Makes the race line-up DATA-DRIVEN so a real election night shows only the contests

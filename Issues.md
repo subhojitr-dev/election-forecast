@@ -235,7 +235,15 @@ real election night still uses the live feed's actual reporting, not this model.
 ---
 
 ## ISSUE #7 — GA Jan-2021 runoff baseline missing 4 counties (OpenElections gap)
-**Logged:** 2026-06-28 · **Status:** 🟡 WORKED AROUND (minor; winners correct)
+**Logged:** 2026-06-28 · **Status:** 🟢 RESOLVED (2026-06-28 — estimate-filled to exact certified)
+
+**RESOLUTION:** `etl_ga_runoff_2021.py` now estimate-fills the 4 missing counties
+(Camden, Chattooga, Grady, Greene): each is split by its real 2020 Senate-general
+lean + size, scaled so the 4-county sum = (certified statewide − loaded). Result:
+all **159** counties present; statewide now EXACTLY certified (Ossoff 2,269,923 /
+Perdue 2,214,979 = 50.61%; Warnock 2,289,113 / Loeffler 2,195,841 = 51.04%). The 4
+filled counties are flagged "ESTIMATED" in `precincts.precinct_name`.
+
 
 **What it is**
 The GA Senate baseline was switched to the Jan 5, 2021 RUNOFF (the seat Ossoff WON

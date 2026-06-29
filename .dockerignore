@@ -1,0 +1,10 @@
+# Keep the backend image small: no frontend, no data, no git/cache.
+ui/
+data/
+.git/
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+*.log

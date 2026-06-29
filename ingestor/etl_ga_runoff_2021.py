@@ -107,8 +107,69 @@ def main():
                 (pid, 2021, race, cand.upper(), party, votes, share))
             rh_rows += 1
 
+    # --- Issue #7: ESTIMATE-FILL the counties OpenElections is missing ---
+    # OpenElections omits a few GA counties. Fill them so the baseline is complete
+    # AND the statewide total matches the certified runoff exactly. Each missing
+    # county is split using its real 2020 Senate-general lean + size, scaled so the
+    # missing-county sum = (certified statewide - what we loaded). Flagged ESTIMATED.
+    CERTIFIED = {"senate": (2269923, 2214979),          # Ossoff / Perdue runoff
+                 "senate_special": (2289113, 2195841)}  # Warnock / Loeffler runoff
+    names = {}
+    loaded_sum = {"senate": [0, 0], "senate_special": [0, 0]}
+    for (race, _c), cands in agg.items():
+        for (party, cand), v in cands.items():
+            names.setdefault(race, {}).setdefault(party, cand)
+            if party == "DEM":
+                loaded_sum[race][0] += v
+            elif party == "REP":
+                loaded_sum[race][1] += v
+    loaded_counties = {c for (_, c) in agg}
+    missing = [c for c in fips if c not in loaded_counties]
+    print(f"\nEstimate-filling {len(missing)} missing counties: {missing}")
+    lean = {}
+    for c in missing:
+        row = conn.execute(
+            """SELECT dem_votes, rep_votes FROM county_rollup
+               WHERE state='GA' AND county=? AND election_year=2020 AND race_type='senate'""",
+            (c,)).fetchone()
+        lean[c] = (row[0] or 0, row[1] or 0) if row else (0, 0)
+    est_rows = 0
+    for race in ("senate", "senate_special"):
+        cert_d, cert_r = CERTIFIED[race]
+        rem_d = cert_d - loaded_sum[race][0]
+        rem_r = cert_r - loaded_sum[race][1]
+        sd = sum(lean[c][0] for c in missing) or 1
+        sr = sum(lean[c][1] for c in missing) or 1
+        alloc = {c: [round(rem_d * lean[c][0] / sd), round(rem_r * lean[c][1] / sr)] for c in missing}
+        # push the rounding residual into the largest county so the sum is EXACT
+        big = max(missing, key=lambda c: lean[c][0] + lean[c][1])
+        alloc[big][0] += rem_d - sum(alloc[c][0] for c in missing)
+        alloc[big][1] += rem_r - sum(alloc[c][1] for c in missing)
+        dname = names[race]["DEM"].upper()
+        rname = names[race]["REP"].upper()
+        for c in missing:
+            cf = fips[c]
+            pid = f"GA-{cf}-CTY"
+            if not conn.execute("SELECT 1 FROM precincts WHERE id=?", (pid,)).fetchone():
+                conn.execute(
+                    """INSERT INTO precincts (id, state, state_abbr, county, county_fips, precinct_name)
+                       VALUES (?,?,?,?,?,?)""",
+                    (pid, state_full, "GA", c, cf, "COUNTY TOTAL (runoff, ESTIMATED)"))
+            di, ri = alloc[c]
+            t2 = di + ri
+            conn.execute(
+                """INSERT INTO results_historical
+                   (precinct_id, election_year, race_type, candidate, party, votes, vote_share)
+                   VALUES (?,?,?,?,?,?,?)""", (pid, 2021, race, dname, "DEM", di, di / t2 if t2 else 0))
+            conn.execute(
+                """INSERT INTO results_historical
+                   (precinct_id, election_year, race_type, candidate, party, votes, vote_share)
+                   VALUES (?,?,?,?,?,?,?)""", (pid, 2021, race, rname, "REP", ri, ri / t2 if t2 else 0))
+            est_rows += 2
+
     conn.commit()
-    print(f"Inserted pseudo-precincts: {inserted_prec} | results_historical rows: {rh_rows}")
+    print(f"Inserted pseudo-precincts: {inserted_prec} | results_historical rows: {rh_rows}"
+          f" | estimate-filled rows: {est_rows}")
 
     # --- verification ---
     for race in ("senate", "senate_special"):

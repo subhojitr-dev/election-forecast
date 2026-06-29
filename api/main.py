@@ -24,7 +24,7 @@ import asyncio
 import os
 import sys
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -62,11 +62,18 @@ def states_for(race, election=DEFAULT_ELECTION):
     return elections.states_for(election, race)
 
 app = FastAPI(title="Election Forecast API", version="0.4.0")
+# CORS: open in dev; in production set CORS_ORIGINS=https://your-app.vercel.app
+# (comma-separated for multiple). See DEPLOY.md.
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],            # dev: open. Lock down before Phase 7 deploy.
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"], allow_headers=["*"],
 )
+
+# Read endpoints change only ~every 60s -> cacheable. This header lets a CDN/edge
+# cache absorb election-night traffic so only cache-misses hit FastAPI (DEPLOY.md §3).
+READ_CACHE = "public, max-age=15, stale-while-revalidate=30"
 
 
 def _summary(bundle: dict) -> dict:
@@ -224,14 +231,17 @@ def health():
 
 
 @app.get("/api/states")
-def states(race: str = Query("president"), election: str = Query(DEFAULT_ELECTION)):
+def states(response: Response, race: str = Query("president"), election: str = Query(DEFAULT_ELECTION)):
     """Panel 1 (swing-state strip) + Panel 10 (EV tracker)."""
+    response.headers["Cache-Control"] = READ_CACHE
     return _states_payload(race, election)
 
 
 @app.get("/api/state/{abbr}")
-def state_detail(abbr: str, race: str = Query("president"), election: str = Query(DEFAULT_ELECTION)):
+def state_detail(abbr: str, response: Response, race: str = Query("president"),
+                 election: str = Query(DEFAULT_ELECTION)):
     """Full bundle for one state: vote bar, gauge, counties, watch list, series."""
+    response.headers["Cache-Control"] = READ_CACHE
     abbr = abbr.upper()
     if abbr not in STATES:
         raise HTTPException(404, f"Unknown state {abbr}")
