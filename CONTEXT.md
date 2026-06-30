@@ -49,9 +49,10 @@ spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads t
   which are the ONLY live-feed test windows — irreplaceable, so the plan is built around them):
 
   ① NOW → mid-July (foundation — start immediately)
-     - ⭐ DECIDE on an AP Elections API (price / sign up) — do this FIRST: it covers all 8
-       states uniformly (incl. WI) and could collapse most per-state ingestor work, so it
-       reshapes everything below.
+     - ✅ DECIDED 2026-06-30: AP Elections API **SKIPPED** (enterprise/quote-only, likely
+       $thousands/cycle — not worth it for a solo build). Going with the FREE state ENR
+       feeds (Clarity + own systems). Revisit AP only if budget/scope changes. So build
+       the feeds directly:
      - Build the NC ingestor (easiest; its dashboard has by-voting-method data) — proves the
        non-Clarity path and gives a clean second feed.
      - Start the Clarity 403 fix (Issue #1) — gates GA/PA/TX/MI.
@@ -70,7 +71,12 @@ spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads t
   ⑧ Election week → Nov 3: final rehearsal → GO LIVE (poller streams the real feed through
      the exact same pipeline as the simulator).
 
-  ⟹ If only 3 things to start NOW: (1) AP API decision · (2) NC ingestor · (3) Clarity 403 fix.
+  ⟹ Start NOW (AP already decided/skipped): (1) NC ingestor · (2) Clarity 403 fix ·
+     (3) precinct-crosswalk skeleton (Issue #3, with county fallback).
+
+  ⚠️ REMAINING-WORK REALITY CHECK: the live feeds DO NOT work yet. Built = the Clarity XML
+  PARSER + the ReplayFeed simulator. NOT built = live Clarity fetch (403), the non-Clarity
+  ingestors (NC/AZ/NV/WI), the precinct crosswalk, the prod poller. That's the bulk of ①–⑤.
 
 ⚠️ Local dev: after ANY change under api/ or ingestor/, restart uvicorn (no --reload) AND click Reset in the UI.
 **To see the dashboard (2 terminals):**
@@ -158,6 +164,14 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
 ---
 
 ## 🔑 KEY DECISIONS MADE (foundational — see PROGRESS.md for the full history)
+  - 2026-06-30 — SKIP the AP Elections API (enterprise/quote-only, ~$thousands; not worth it
+    for a solo build). Go with the FREE state ENR feeds (Clarity + own systems). Revisit AP
+    only if budget/scope changes.
+  - 2026-06-30 — COUNTY-LEVEL FALLBACK is acceptable: where precinct-level live data isn't
+    available for a state/county, use COUNTY-level AND show a visible caption on that county:
+    **"Precinct-level data not available for this county."** Do NOT block on precinct-
+    everywhere. (Implement the caption when the live ingestors/crosswalk are built — the
+    historical/replay data is all precinct-level, so the distinction only appears live.)
   - QA tolerance ±0.1% per candidate (MIT precinct data ≠ exact certified).
   - Added 2024 President as secondary reference (chosen over 2016).
   - Added 2018 Senate (TX Cruz–O'Rourke) + 2024 Senate (fills PA/NV/WI).
