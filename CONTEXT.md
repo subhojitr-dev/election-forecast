@@ -12,40 +12,59 @@
 
 ## 🚦 WHERE WE ARE RIGHT NOW
 
-  Phase 0  ✅ COMPLETE   Planning / architecture
-  Phase 1  ✅ COMPLETE   ETL — baseline.db built + QA-verified
-  Phase 2  ✅ COMPLETE   Live ingestor — poller + replay + mock
-  Phase 3  ✅ COMPLETE   Analytics — shift, projection, snapshot history, win prob
-  Phase 4  ✅ COMPLETE   FastAPI REST + WebSocket (serves analytics)
-  Phase 5  ✅ COMPLETE   React UI (10 panels) — Vite, consumes the API
-  Phase 6  ✅ COMPLETE   Integration test — all 8 states × 2 races reproduce reality
-  Phase 7  ⬜ NEXT       Deploy — public web URL (host API+DB+UI; pick a domain)
+  Phases 0–6  ✅ COMPLETE   ETL · ingestor · analytics · API/WS · React UI · integration test
+  Phase 7     🔄 IN PROGRESS  Deploy to a public URL
+     ├─ Backend  ✅ **LIVE on Render** → https://election-forecast.onrender.com
+     └─ Frontend ⬜ PENDING (Vercel — USER action, see NEXT below)
 
-**Next action:** Phase 7 (deploy) — OR the "for fun" hypotheticals (scenarios
-already built: in the UI scenario dropdown pick Ossoff vs Vance D+5 / AOC vs
-Vance D+5, then click Next Batch). 2026-Senate-candidates scenario still TODO.
+### 🔴 NEXT SESSION — START HERE
+The backend is deployed + serving (verified: /api/health = ok, 771,834 rows; all 7
+elections; cache headers live). The ONLY remaining deploy step is the **frontend on
+Vercel**:
+  - USER does: vercel.com/new → import `election-forecast` → **Root Directory = `ui`**
+    → add env var `VITE_API_BASE=https://election-forecast.onrender.com` → Deploy.
+  - THEN: on Render → Environment → add `CORS_ORIGINS=<the-vercel-url>` (locks CORS).
+  - If already done: get the Vercel URL and verify the dashboard ↔ backend end-to-end.
+After that, Phase 7 is complete and the next focus is LIVE-READINESS (see pending list).
 
-**NEW — election-night simulator:** UI has a scenario dropdown + Reset + "Next
-Batch ▶" stepper (20→40→...→100%). Backend: api/simulation.py + /api/sim/*.
-On real election day the Phase 2 poller replaces the button (same data path).
-integration_test.py = repeatable end-to-end assertion (run: python integration_test.py).
-PERF (2026-06-27, Issue #5): Next Batch ~1-2s (was 18-50s). Fixes: results_live
-indexes + WAL, /api/states reads live_snapshots (no recompute), in-memory
-baseline cache, one-commit-per-batch.
-REVEAL (2026-06-27, Issue #6): simulator now reveals counties PROPORTIONALLY /
-in parallel (ReplayFeed order="proportional") — at X% statewide each county is
-~X% in (was: whole counties one at a time). NOTE in true-2020 mode shift≈0 &
-convergence hugs baseline BY DESIGN (same data); use a swing scenario (Ossoff/
-Vance D+5) to see real shift/convergence. See PROGRESS.md / Issues.md.
-⚠️ After ANY change under api/ or ingestor/: restart the API (no --reload) AND
-click Reset in the UI (Reset rebuilds the sim feeds).
+### 🚀 Deployment facts (so you don't re-derive them)
+  - **GitHub:** github.com/subhojitr-dev/election-forecast (branch `main`). Data (CSVs +
+    baseline.db, 1.4 GB) is **gitignored** — see DATA_SETUP.md to obtain/rebuild.
+  - **Backend:** Render Docker web service (FREE tier). On boot, `entrypoint.sh` →
+    `download_db.py` fetches baseline.db (43 MB gzip) from a **GitHub Release** (tag
+    `db-v1`, asset `baseline.db.gz`) via the `DB_URL` env var, unzips to data/db/.
+    - ⚠️ Free tier **spins down after ~15 min idle** → first hit after = ~30–60s cold start.
+    - ⚠️ Ephemeral disk → re-downloads DB each boot; sim state resets (fine for demo).
+    - For election night: upgrade to **Starter ($7/mo) + a persistent disk** at data/db/.
+    - **If baseline.db changes:** re-gzip it, upload a NEW release asset, update `DB_URL`.
+  - **Cache-Control** (max-age=15, swr=30) on /api/states + /api/state = the scale lever.
+  - **Local dev still works** unchanged (2 terminals, below) — `VITE_API_BASE` unset = relative.
+
+### 📋 WHAT'S PENDING (priority order)
+  1. **Frontend deploy on Vercel + CORS lockdown** (USER — the immediate next step, above).
+  2. **LIVE-READINESS for Nov 3** (the long pole; time-gated by the July/Aug primaries) —
+     a. Feed audit round 2 vs LIVE primaries: **AZ Jul 21 · MI Aug 4 · WI Aug 11** (FEED_AUDIT.md).
+     b. Beat the **Clarity 403** (Issue #1).
+     c. Build non-Clarity ingestors: **NC** (easiest — has by-voting-method data) → AZ/NV → **WI** (hardest, no statewide feed).
+     d. **Precinct crosswalk** (Issue #3): live 2026 names → baseline ids; county fallback.
+     e. **Wire the live poller** as a prod background worker (run_poller replaces Next Batch).
+     f. ⭐ **Price an AP Elections API** — may cover all 8 states uniformly (incl. WI) + replace several ingestors. See FEED_AUDIT.md.
+  3. **Data slot-ins** (low priority): load **2022 Senate** for the general2028 stub; fill **MI 2026 nominees** after the Aug 4 primary (1-line edit in api/elections.py `candidates`).
+  4. **Election-night ops:** upgrade Render to paid + disk; redundancy/monitoring; SQLite→Postgres if high load.
+
+⚠️ Local dev: after ANY change under api/ or ingestor/, restart uvicorn (no --reload) AND click Reset in the UI.
 **To see the dashboard (2 terminals):**
   1) uvicorn api.main:app --port 8000
   2) cd ui && npm run dev      → open http://localhost:5173
-**DB state:** ALL 8 states populated TRUE (zero swing) for BOTH races —
-President vs 2020; Senate vs most-recent (GA = Jan-2021 RUNOFF county-level,
-NC 2020, others 2024). Winners match reality (GA Senate now Ossoff D 50.82%).
-API uses per-state Senate baseline (SENATE_BASELINE in api/main.py).
+**DB state:** ALL 8 states populated for BOTH races. Winners match reality. GA Senate
+baseline = Jan-2021 RUNOFF (county-level, **now 159/159 counties, exactly certified:
+Ossoff 50.61% / Warnock 51.04%** after Issue #7 estimate-fill — RESOLVED).
+**Baselines + which races are on each ballot now come from the ELECTION MANIFEST
+`api/elections.py`** (not the old SENATE_BASELINE dict). 7 elections: demo (all races),
+pres2024 / sen2020 / sen2024 / sen2018 (historical replays), general2026 (Senate
+GA/MI/NC/TX with REAL nominees — Ossoff/Collins, Cooper/Whatley, Talarico/Paxton,
+MI TBD), general2028 (stub — needs 2022 Senate data). The UI has an **Election dropdown**
++ a dynamic **race toggle** (only races on that ballot show).
 Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noise]
 (API has no --reload here; restart uvicorn after editing api/ code.)
 

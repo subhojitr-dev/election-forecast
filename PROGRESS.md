@@ -5,6 +5,25 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-06-29 — Backend DEPLOYED LIVE on Render (Phase 7 in progress)
+
+- **Backend is live → https://election-forecast.onrender.com** (Render Docker web service,
+  FREE tier). Verified in production: `/api/health` ok (771,834 historical rows),
+  `/api/elections` (7 elections), `/api/states` (8 states + EV tally), Cache-Control header present.
+- **DB provisioning solved:** baseline.db (217 MB) gzipped → **43 MB**, uploaded as a
+  **GitHub Release** (tag `db-v1`, asset `baseline.db.gz`). On boot `entrypoint.sh` →
+  `download_db.py` fetches it via the `DB_URL` env var and unzips to data/db/. Render logs
+  confirmed `[db] baseline.db ready (226,824,192 bytes)` → uvicorn up → "service is live".
+- **Free-tier caveats:** spins down after ~15 min idle (cold start re-downloads the 43 MB DB);
+  ephemeral disk so sim state resets. For election night → Starter ($7/mo) + a persistent disk.
+- **NEXT (USER):** Vercel frontend — vercel.com/new → import repo → **Root Directory=`ui`** →
+  `VITE_API_BASE`=the Render URL → Deploy; then set `CORS_ORIGINS`=the Vercel URL on Render.
+  That completes Phase 7.
+- CONTEXT.md top ("WHERE WE ARE / NEXT SESSION START HERE / PENDING order") rewritten;
+  cross-session memory updated.
+
+---
+
 ## 2026-06-28 — Issue #7 fixed · Phase-7 deploy wiring · feed audit (round 1) · pushed to GitHub
 
 - **Issue #7 RESOLVED** — `etl_ga_runoff_2021.py` now estimate-fills the 4 counties
