@@ -56,13 +56,15 @@ spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads t
      - Build the NC ingestor (easiest; its dashboard has by-voting-method data) — proves the
        non-Clarity path and gives a clean second feed.
      - Start the Clarity 403 fix (Issue #1) — gates GA/PA/TX/MI.
-  ② Jul 21 — AZ primary (live test #1): pull AZ feed end-to-end; start the AZ precinct crosswalk.
-  ③ Aug 4 — MI primary (live test #2): per-county Clarity discovery; MI crosswalk; fill the
+  ② Jul 21 — AZ primary (live test #1): pull AZ's COUNTY feed end-to-end (clean county→county join).
+  ③ Aug 4 — MI primary (live test #2): per-county Clarity discovery (county totals); fill the
      MI 2026 nominees (1-line edit in api/elections.py `candidates`).
-  ④ Aug 11 — WI primary (live test #3): the hardest feed (no statewide feed — AP / county scrape).
-  ⑤ Aug → Sep — harden: finish all 8 ingestors + precinct crosswalks (Issue #3; county
-     fallback for unmatched); wire the live poller as a prod background worker (replaces
-     "Next Batch"); load 2022 Senate data (for the general2028 stub).
+  ④ Aug 11 — WI primary (live test #3): WI at COUNTY-level (no precinct feed exists — fine now).
+  ⑤ Aug → Sep — harden: finish all 8 COUNTY ingestors; wire the live poller as a prod
+     background worker (replaces "Next Batch"); load 2022 Senate (general2028 stub).
+     NOTE: precinct crosswalk (Issue #3) is MOOT under county-level — DROPPED from the path.
+  ⑨ AFTER everything works — OPTIONAL precision upgrade: precinct-level drill-down for GA
+     (Clarity) + NC (dashboard) only. Not required for Nov 3.
   ⑥ Early–mid Oct: election-ID auto-discovery; test the no-summer-primary states
      (NV/NC/PA/TX/GA) against archives/specials.
   ⑦ ~2 wks before (mid–late Oct): capture the real 2026 election IDs (states publish the
@@ -71,12 +73,12 @@ spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads t
   ⑧ Election week → Nov 3: final rehearsal → GO LIVE (poller streams the real feed through
      the exact same pipeline as the simulator).
 
-  ⟹ Start NOW (AP already decided/skipped): (1) NC ingestor · (2) Clarity 403 fix ·
-     (3) precinct-crosswalk skeleton (Issue #3, with county fallback).
+  ⟹ Start NOW (county-level v1; AP & the crosswalk are both OFF the table): (1) NC county
+     ingestor · (2) Clarity 403 fix · (3) a 2nd county feed (AZ or MI) to prove the pattern.
 
   ⚠️ REMAINING-WORK REALITY CHECK: the live feeds DO NOT work yet. Built = the Clarity XML
-  PARSER + the ReplayFeed simulator. NOT built = live Clarity fetch (403), the non-Clarity
-  ingestors (NC/AZ/NV/WI), the precinct crosswalk, the prod poller. That's the bulk of ①–⑤.
+  PARSER + the ReplayFeed simulator. NOT built = live Clarity fetch (403) + the per-state
+  COUNTY ingestors + the prod poller. (Precinct crosswalk = MOOT under county-level.)
 
 ⚠️ Local dev: after ANY change under api/ or ingestor/, restart uvicorn (no --reload) AND click Reset in the UI.
 **To see the dashboard (2 terminals):**
@@ -167,11 +169,17 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
   - 2026-06-30 — SKIP the AP Elections API (enterprise/quote-only, ~$thousands; not worth it
     for a solo build). Go with the FREE state ENR feeds (Clarity + own systems). Revisit AP
     only if budget/scope changes.
-  - 2026-06-30 — COUNTY-LEVEL FALLBACK is acceptable: where precinct-level live data isn't
-    available for a state/county, use COUNTY-level AND show a visible caption on that county:
-    **"Precinct-level data not available for this county."** Do NOT block on precinct-
-    everywhere. (Implement the caption when the live ingestors/crosswalk are built — the
-    historical/replay data is all precinct-level, so the distinction only appears live.)
+  - 2026-06-30 — **GO COUNTY-LEVEL FOR ALL 8 STATES as the live v1.** Correct for the overall
+    result (county totals aggregate to the SAME statewide winner / win-prob / convergence);
+    only loses precinct drill-down + a little early-night precision (which `reporting_weight`
+    already damps). WHY it's the right call: county FIPS is stable year-to-year, so the
+    **PRECINCT CROSSWALK (Issue #3) becomes MOOT** (clean county→county join, no name-matching),
+    and **WI** (no precinct feed) becomes tractable. Reuses `county_rollup` + the proven
+    GA-runoff "county-as-pseudo-precinct" pattern (1 pseudo-precinct per county everywhere).
+  - 2026-06-30 — **LATER (after the county-level live pipeline works end-to-end):** add
+    PRECINCT-LEVEL drill-down for the EASY states only — **GA (Clarity) + NC (its dashboard)**
+    — as a precision enhancement, NEVER a requirement. Other states stay county-level. Where a
+    county is shown at county grain, caption it: "Precinct-level data not available for this county."
   - QA tolerance ±0.1% per candidate (MIT precinct data ≠ exact certified).
   - Added 2024 President as secondary reference (chosen over 2016).
   - Added 2018 Senate (TX Cruz–O'Rourke) + 2024 Senate (fills PA/NV/WI).
@@ -185,12 +193,13 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
 ---
 
 ## ⚠️ TOP OPEN RISKS (full detail in Issues.md)
-  #1 Clarity CDN 403s scrapers — worked around for dev, UNSOLVED for live.
-  #3 Live precinct-name → 2020 baseline mapping (the crosswalk; the real live
-     challenge) — strategy decided, not yet built.
-  (#4 results_live had no time-series — RESOLVED in Phase 3 via live_snapshots.)
-  Confidence on election-night live: ~70-75% overall; firms up after the
-  July live-access test against a real 2026 primary.
+  #1 Clarity CDN 403s scrapers — UNSOLVED for live, but TRACTABLE: browser-faithful fetch
+     (session cookies + header order) → headless browser (Playwright) fallback. Effort, not a wall.
+  #3 Precinct crosswalk — **MOOT under the county-level v1 decision** (county FIPS join is
+     exact; no name-matching). Only re-enters IF/when GA+NC precinct drill-down is added later.
+  (RESOLVED: #4 time-series → live_snapshots · #5 perf · #6 reveal · #7 GA runoff counties · #8 feed audit.)
+  Confidence on election-night live: HIGHER now — county-level erases the crosswalk + WI risk;
+  the main remaining unknown is the 403 fetch. Firms up after the July/Aug primary live tests.
 
 ---
 

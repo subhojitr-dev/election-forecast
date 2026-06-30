@@ -77,7 +77,15 @@ solid, so no dependency on the library's networking layer.
 ---
 
 ## ISSUE #3 — Live precinct NAME → baseline precinct_id mapping
-**Logged:** 2026-06-25 · **Status:** 🔴 OPEN (the main live challenge)
+**Logged:** 2026-06-25 · **Status:** ⚪ DEFERRED / MOOT for v1 (2026-06-30 decision)
+
+**DECISION 2026-06-30 — county-level v1 makes this MOOT.** We go COUNTY-LEVEL for all 8
+states on election night (county FIPS is stable year-to-year → a clean exact county→county
+join, no name-matching, no splits/merges). So the crosswalk is NOT needed for v1, and WI
+(no precinct feed) is handled. The crosswalk only re-enters IF/when precinct-level drill-down
+is added later for the easy states (GA via Clarity, NC via its dashboard) as a precision
+enhancement. The original precinct strategy below is retained for that future work.
+
 
 **What it is**
 Clarity labels a precinct one way; our 2020/2024 baseline labels the "same"
