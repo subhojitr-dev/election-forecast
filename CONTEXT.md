@@ -40,18 +40,37 @@ spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads t
   - **Cache-Control** (max-age=15, swr=30) on /api/states + /api/state = the scale lever.
   - **Local dev still works** unchanged (2 terminals, below) — `VITE_API_BASE` unset = relative.
 
-### 📋 WHAT'S PENDING (priority order)
-  1. ✅ **Frontend DEPLOYED on Vercel** (election-forecast-silk.vercel.app). Small
-     remaining: CORS lockdown on Render (above).
-  2. **LIVE-READINESS for Nov 3** (the long pole; time-gated by the July/Aug primaries) —
-     a. Feed audit round 2 vs LIVE primaries: **AZ Jul 21 · MI Aug 4 · WI Aug 11** (FEED_AUDIT.md).
-     b. Beat the **Clarity 403** (Issue #1).
-     c. Build non-Clarity ingestors: **NC** (easiest — has by-voting-method data) → AZ/NV → **WI** (hardest, no statewide feed).
-     d. **Precinct crosswalk** (Issue #3): live 2026 names → baseline ids; county fallback.
-     e. **Wire the live poller** as a prod background worker (run_poller replaces Next Batch).
-     f. ⭐ **Price an AP Elections API** — may cover all 8 states uniformly (incl. WI) + replace several ingestors. See FEED_AUDIT.md.
-  3. **Data slot-ins** (low priority): load **2022 Senate** for the general2028 stub; fill **MI 2026 nominees** after the Aug 4 primary (1-line edit in api/elections.py `candidates`).
-  4. **Election-night ops:** upgrade Render to paid + disk; redundancy/monitoring; SQLite→Postgres if high load.
+### 📋 PENDING — EXECUTION ORDER (chronological; full dated timeline in PREP.md)
+
+  ✅ DONE: deploy (frontend Vercel + backend Render). Small wrap: confirm CORS lockdown
+     saved on Render (CORS_ORIGINS = the Vercel URL).
+
+  Everything below = LIVE-READINESS for Nov 3 (the long pole; gated by the summer primaries,
+  which are the ONLY live-feed test windows — irreplaceable, so the plan is built around them):
+
+  ① NOW → mid-July (foundation — start immediately)
+     - ⭐ DECIDE on an AP Elections API (price / sign up) — do this FIRST: it covers all 8
+       states uniformly (incl. WI) and could collapse most per-state ingestor work, so it
+       reshapes everything below.
+     - Build the NC ingestor (easiest; its dashboard has by-voting-method data) — proves the
+       non-Clarity path and gives a clean second feed.
+     - Start the Clarity 403 fix (Issue #1) — gates GA/PA/TX/MI.
+  ② Jul 21 — AZ primary (live test #1): pull AZ feed end-to-end; start the AZ precinct crosswalk.
+  ③ Aug 4 — MI primary (live test #2): per-county Clarity discovery; MI crosswalk; fill the
+     MI 2026 nominees (1-line edit in api/elections.py `candidates`).
+  ④ Aug 11 — WI primary (live test #3): the hardest feed (no statewide feed — AP / county scrape).
+  ⑤ Aug → Sep — harden: finish all 8 ingestors + precinct crosswalks (Issue #3; county
+     fallback for unmatched); wire the live poller as a prod background worker (replaces
+     "Next Batch"); load 2022 Senate data (for the general2028 stub).
+  ⑥ Early–mid Oct: election-ID auto-discovery; test the no-summer-primary states
+     (NV/NC/PA/TX/GA) against archives/specials.
+  ⑦ ~2 wks before (mid–late Oct): capture the real 2026 election IDs (states publish the
+     general at 0%); FULL end-to-end dry run, all 8 × both races; upgrade Render → Starter
+     ($7/mo) + persistent disk; add monitoring (SQLite→Postgres only if very high load).
+  ⑧ Election week → Nov 3: final rehearsal → GO LIVE (poller streams the real feed through
+     the exact same pipeline as the simulator).
+
+  ⟹ If only 3 things to start NOW: (1) AP API decision · (2) NC ingestor · (3) Clarity 403 fix.
 
 ⚠️ Local dev: after ANY change under api/ or ingestor/, restart uvicorn (no --reload) AND click Reset in the UI.
 **To see the dashboard (2 terminals):**
