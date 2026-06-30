@@ -5,6 +5,36 @@
 
 ---
 
+## 📌 UPDATE 2026-06-30 — read `CONTEXT.md` FIRST; this brief is the original spec
+
+Several specifics below are now **superseded**. The current source of truth is
+**`CONTEXT.md`** (start-here snapshot) + `PROGRESS.md` / `Issues.md`. Key changes since
+this brief was written:
+
+- **Status:** Phases 0–6 COMPLETE. **Phase 7 (deploy) IN PROGRESS — backend is LIVE on
+  Render → https://election-forecast.onrender.com; frontend (Vercel) PENDING.** Repo:
+  github.com/subhojitr-dev/election-forecast (data gitignored). Deploy: `DEPLOY.md`.
+- **Election manifest (`api/elections.py`) REPLACED the old `SENATE_BASELINE` dict.** It
+  defines, per election, which races + which states + baseline year + real nominees. The UI
+  now has an **Election dropdown** + a dynamic **race toggle**, so a real election night shows
+  only the contests on that ballot (Nov-2026 = Senate GA/MI/NC/TX, NO President; 2028 = Pres +
+  Senate). `baseline_for`/`states_for` are election-aware; sim sessions keyed by (election,race).
+- **GA Senate baseline = the Jan-2021 RUNOFF** (Ossoff/Warnock WON; county-level, 159/159,
+  exactly certified — Issue #7 resolved). Plus a GA-only **"GA Special"** Warnock race view.
+- **Ballot-mode dimension:** `results_live` gained a `mode` column (mail/early/election-day/
+  military/all; OPTIONAL, defaults 'all' → graceful fallback). New **County Insight** panel
+  (note box + ballot-type selector) + turnout/pending county columns + `mode_breakdown()` +
+  `/api/state/{abbr}/county/{cty}` + a synthetic red-mirage test scenario. Highest-leverage
+  real-night feature.
+- **Live feeds ≠ all Clarity** (`FEED_AUDIT.md`): GA=Clarity statewide; PA/TX/MI=county-level
+  Clarity; AZ/NV=own systems; NC=own dashboard (best — has by-voting-method); WI=no statewide
+  feed (hardest). ⭐ Consider an **AP Elections API**. Dataverse/MIT is the BASELINE, not a feed.
+- **New docs:** DEPLOY · FEED_AUDIT · TESTING · DATA_SETUP · PREP (all in CONTEXT.md doc map).
+
+The architecture, model, panel concepts, and data approach below remain accurate.
+
+---
+
 ## 🎯 WHAT WE ARE BUILDING
 
 A real-time election night forecasting dashboard that does three things:

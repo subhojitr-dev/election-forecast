@@ -8,6 +8,14 @@ current win probability — an open, precinct-level version of the "election nee
 > New here? Read **`DASHBOARD_GUIDE.md`** (how to read/use it) and **`CONTEXT.md`**
 > (current project state). Full spec: `HANDOVER_BRIEF.md`.
 
+## 🚀 Deployed
+- **Backend (live):** https://election-forecast.onrender.com (Render). Try
+  `/api/health`, `/docs`, or `/api/states?race=president&election=demo`.
+- **Frontend:** Vercel — pending (deploy the `ui/` folder with `VITE_API_BASE`=the
+  Render URL). Full plan + caching + scaling: **`DEPLOY.md`**.
+- **Source:** github.com/subhojitr-dev/election-forecast (the 1.4 GB of data is
+  gitignored — see `DATA_SETUP.md` to obtain/rebuild it).
+
 ---
 
 ## Running it locally
@@ -99,10 +107,15 @@ start again.
 
 ## Using the dashboard (quick version)
 
-- Use the **President / Senate** toggle and click any **state card** to drill in.
+- Pick an **Election** (dropdown) — only the races on that ballot appear (e.g. the
+  Nov-2026 midterm shows Senate only, no President).
+- Use the **President / Senate / GA Special** toggle and click any **state card** to drill in.
 - To simulate an election night: pick a **Scenario**, click **Reset**, then click
   **Next Batch ▶** repeatedly to reveal results 20% → 40% → … → 100%.
-- Full walkthrough: **`DASHBOARD_GUIDE.md`**.
+- Click a **county** in the table → the **County Insight** box (top-right) explains
+  what's happening (turnout vs benchmark, votes pending + which way they lean); the
+  **ballot-type tabs** (mail / early / election-day) show each bucket's status.
+- Full walkthrough: **`DASHBOARD_GUIDE.md`**; step-by-step tests: **`TESTING.md`**.
 
 To (re)load a race's data directly from the command line:
 ```powershell
@@ -122,7 +135,12 @@ python analytics/engine.py GA president 2020        # replay Georgia 2020
 |------|---------|
 | `CONTEXT.md` | Current state — start here each session |
 | `DASHBOARD_GUIDE.md` | How to read, run, and simulate the dashboard |
+| `TESTING.md` | Plain-language test guide: what to click, what you should see |
 | `HANDOVER_BRIEF.md` | Full spec (panels, model, schema, phase plan) |
+| `QUICK_REFERENCE.md` | At-a-glance cheat sheet (schema, endpoints, URLs) |
+| `DATA_SETUP.md` | Every data file: full path, contents, source/DOI |
+| `DEPLOY.md` | Phase 7 deployment plan (Vercel + Render + caching) |
+| `FEED_AUDIT.md` | Per-state live ENR feed audit (Clarity vs own; mode availability) |
+| `PREP.md` | Election-night live-data readiness plan + timeline |
 | `PROGRESS.md` | Chronological work log |
 | `Issues.md` | Known issues, fixes, and the election-night readiness plan |
-| `QUICK_REFERENCE.md` | At-a-glance cheat sheet |

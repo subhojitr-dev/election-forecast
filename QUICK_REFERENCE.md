@@ -90,6 +90,7 @@ TABLE results_live
   vote_share REAL
   precincts_reporting INTEGER
   total_precincts INTEGER
+  mode TEXT            -- election_day|early|mail|military|all (ballot-mode dim; default 'all')
   last_updated TIMESTAMP
 
 TABLE county_rollup
@@ -104,24 +105,38 @@ TABLE county_rollup
   total_votes INTEGER
   dem_share REAL
   rep_share REAL
+
+TABLE live_snapshots          -- per-poll statewide time-series (powers the convergence chart)
+  id INTEGER PK
+  captured_at TIMESTAMP
+  state TEXT
+  race_type TEXT
+  baseline_year INTEGER
+  pct_reporting REAL
+  dem_votes / rep_votes / total_votes INTEGER
+  dem_share_2pty / statewide_shift / projected_dem_share / win_prob_dem REAL
+  confidence_tier TEXT
 ```
+
+GA Senate also stores election_year=2021 (the Jan runoff, county-level pseudo-precincts
+"GA-{fips}-CTY"): race_type 'senate' (Ossoff/Perdue) + 'senate_special' (Warnock/Loeffler).
 
 ---
 
-## 🔴 Live Data — Clarity ENR Feeds (Election Night)
+## 🔴 Live Data — per-state ENR systems (Election Night) — see FEED_AUDIT.md
 
-  GA:  https://results.enr.clarityelections.com/GA/{id}/
-  PA:  https://results.enr.clarityelections.com/PA/{id}/
-  AZ:  https://results.enr.clarityelections.com/AZ/{id}/
-  NV:  https://results.enr.clarityelections.com/NV/{id}/
-  TX:  https://results.enr.clarityelections.com/TX/{id}/
-  NC:  https://er.ncsbe.gov/
-  WI:  Wisconsin SOS direct feed
-  MI:  Michigan SOS direct feed
+  GA:  Clarity, STATEWIDE   results.enr.clarityelections.com/GA/{id}/   (parser built; mode cols ✓)
+  PA:  Clarity, COUNTY-by-county   .../PA/{county}/{id}/   (per-county discovery)
+  TX:  Clarity, COUNTY-by-county   .../TX/{county}/{id}/   (per-county discovery)
+  MI:  Clarity (counties) + MI SoS   .../MI/{county}/{id}/
+  AZ:  OWN — results.arizona.vote   (statewide; confirm live mode)
+  NV:  OWN — Results.NV.gov / nvsos.gov/electionresults   (statewide)
+  NC:  OWN — er.ncsbe.gov   (dashboard WITH "by voting method" — best/easiest)
+  WI:  ⚠️ NO statewide feed — 72 county clerk sites, AP-aggregated (HARDEST)
 
-Clarify library:  pip install clarify
-Poll interval:    60 seconds
-Version check:    Always fetch current_ver.txt first
+⭐ Consider an AP Elections API (uniform across all 8 + likely mode splits) — FEED_AUDIT.md.
+Dataverse/MIT is the historical BASELINE, NOT a live feed. Clarify lib: pip install clarify.
+Poll interval 60s · fetch current_ver.txt first · election_id changes each cycle (mid-late Oct).
 
 ---
 
@@ -138,20 +153,28 @@ Version check:    Always fetch current_ver.txt first
 
 ## 📅 Phase Status  (see CONTEXT.md for the live snapshot)
 
-  Phase 0  ✅ COMPLETE   Planning (Claude.ai)
-  Phase 1  ✅ COMPLETE   ETL — CSV → SQLite baseline.db (multi-year)
-  Phase 2  ✅ COMPLETE   Clarity ENR live poller (+ replay + mock)
-  Phase 3  ✅ COMPLETE   Analytics — shift + projection + snapshot history + Bayesian
-  Phase 4  ✅ COMPLETE   FastAPI REST API + WebSocket
-  Phase 5  ✅ COMPLETE   React UI — 10 panels (Vite + Recharts)
-  Phase 6  ✅ COMPLETE   Integration test + Next-Batch simulator
-  Phase 7  ⬜ NEXT       Deploy — public web URL
+  Phases 0–6  ✅ COMPLETE   Planning · ETL · poller · analytics · API/WS · React UI · integration test
+  Phase 7     🔄 IN PROGRESS  Deploy — BACKEND LIVE on Render; frontend (Vercel) PENDING
 
-Integration test:  python integration_test.py   (all 8 states x 2 races)
-Simulator API:  /api/sim/reset · /api/sim/next · /api/sim/status · /api/scenarios
+## 🚀 Deployment (2026-06)
+  Backend (live):  https://election-forecast.onrender.com   (Render Docker, free tier)
+  Frontend:        Vercel — PENDING (Root Directory=ui, env VITE_API_BASE=<render URL>)
+  GitHub:          github.com/subhojitr-dev/election-forecast  (data gitignored)
+  DB on host:      baseline.db gzipped (43 MB) as GitHub Release tag db-v1; entrypoint.sh
+                   + download_db.py fetch it via DB_URL env var on boot. See DEPLOY.md.
 
-API run:  uvicorn api.main:app --reload --port 8000   (docs at /docs)
-  /api/states?race=president · /api/state/{abbr}?race= · /api/state/{abbr}/series · ws /ws
+## 🗳️ Election manifest (api/elections.py — replaces old SENATE_BASELINE)
+  Per-election: which races, which states, baseline year, real nominees. 7 elections:
+  demo (all races) · pres2024 · sen2020 · sen2024 · sen2018 (historical replays) ·
+  general2026 (Senate GA/MI/NC/TX, real nominees, NO President) · general2028 (stub).
+  UI has an Election dropdown + dynamic race toggle (real night shows only ballot races).
+
+Integration test:  python integration_test.py   (all 16 races converge + correct winner)
+Simulator API:  /api/sim/{reset,next,status} · /api/scenarios   (all take ?election= &race=)
+
+API run (local):  uvicorn api.main:app --port 8000   (docs at /docs)
+  /api/elections · /api/states?race=&election= · /api/state/{abbr}?race=&election=
+  /api/state/{abbr}/county/{cty}  (county note + ballot-mode breakdown) · /api/state/{abbr}/series · ws /ws
 UI run:   cd ui && npm run dev   → http://localhost:5173  (needs API running)
 
 ---
@@ -181,7 +204,8 @@ UI run:   cd ui && npm run dev   → http://localhost:5173  (needs API running)
   CLARITY IDs   election_id changes each election cycle
                 Fetch from SOS website fresh before every election night
 
-  NV + WI       No 2020 Senate data — need 2022 file from Dataverse
+  2022 SENATE   Not yet loaded — needed for the general2028 stub (Class-3 seats).
+                DOI 10.7910/DVN/IAD3XR. NV/PA/WI had no 2020 Senate (use 2018/2024).
 
 ---
 

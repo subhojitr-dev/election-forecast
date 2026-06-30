@@ -105,10 +105,22 @@ Eight clickable cards. Each shows: **state + electoral votes**, the **lean**
 - **What to look for:** which states are close ("Toss-Up"), and whether the
   shift is blue or red. **Click any card** to drill into it.
 
+### Election dropdown (top-left of the toolbar) — NEW
+Pick which **election** you're viewing; only the races actually on that ballot appear:
+- **Demo · historical sandbox** — all races, all 8 states (the original playground).
+- **Test · 2024 President / 2020·2024·2018 Senate** — replay a real past election.
+- **General · Nov 3, 2026 (midterm)** — Senate only (GA/MI/NC/TX), with the **real
+  2026 nominees** (Ossoff/Collins, Cooper/Whatley, Talarico/Paxton; MI TBD). No
+  President — midterms don't have one.
+- **General · Nov 7, 2028** — President + Senate (stub; needs 2022 data loaded).
+
 ### Panel 2 — Race Toggle
-`President | Senate`. Switches every panel between the two races.
-- **Note:** Senate compares against each state's *most recent* Senate race
-  (GA & NC = 2020; the rest = 2024), since not every state had a 2020 Senate race.
+`President | Senate | GA Special`. Switches the panels between the races on the
+selected election's ballot.
+- **GA Special** = the Georgia Jan-2021 Warnock-vs-Loeffler runoff (a GA-only race).
+- **Note:** each Senate race compares against that *seat's last contest* (the 2026
+  GA/MI/NC/TX seats vs 2020, GA's vs the 2021 runoff), set by the election manifest
+  (`api/elections.py` — which replaced the old SENATE_BASELINE).
 
 ### Panel 3 — County Search
 Type a county name (e.g. `FULTON`) to instantly filter the county table below.
@@ -120,11 +132,14 @@ and **who leads by how much**.
   (see "red mirage" in §7).
 
 ### Panel 5 — Convergence Chart
-A line of the **live Democratic %** as precincts report, against a **dashed flat
-line = the 2020 baseline**.
-- **Solid line ABOVE dashed →** Democrat doing better than 2020.
-- **Solid line BELOW dashed →** Democrat doing worse.
-- The gap between them *is* the story of the night.
+The **live Democratic two-party %** as precincts report, against a **dashed flat
+line = the baseline** (last election). It's **anchored at the baseline at 0%** and
+**extends rightward** across a fixed 0→100% frame as batches arrive (reads as one
+continuous line, not a redraw).
+- **Solid blue** while the Democrat is **at/above 50%**; **dashed blue** (same colour)
+  while **below 50%** — so who's ahead is visible at a glance.
+- Line **above the dashed baseline** = Democrat over-performing last time; **below** =
+  under-performing. The gap *is* the story of the night. (Y-axis floors at 30%.)
 
 ### Panel 6 — Win Probability Gauge
 A needle between **DEM (blue, left)** and **REP (red, right)**.
@@ -155,6 +170,15 @@ past margins) — the highest-impact places still to report.
 ### Panel 10 — EV Tracker (right sidebar)
 Mini scoreboard of all 8 states: electoral votes + lean, and a running
 **D vs R electoral-vote tally**. Click a state to jump to it.
+
+### Panel 11 — County Insight (right sidebar, top) — NEW
+**Click any county** in the table and this box explains, in plain English, what's
+happening there: the Democrat's **share vs the 2020 benchmark**, **turnout vs 2020**,
+how many **votes are still pending**, and **which way they lean** (e.g. "mail still
+uncounted → the rest likely breaks Democratic"). The **ballot-type tabs** (All /
+Election-Day / Early / Mail / Military) show each bucket's counted votes + lean — the
+key to spotting a red-mirage→blue-shift before it happens. (The county table also gains
+**"Turn v20"** = turnout vs 2020 and **"Pending"** = votes still to come.)
 
 ---
 
@@ -203,11 +227,13 @@ convergence line, and the watch list change with each batch.
 
 **President:**
 - **True (real 2020 results)** — replays what actually happened. Shift reads ~0
-  everywhere (it *is* 2020 vs 2020). Biden wins GA/PA/AZ/NV/WI/MI; Trump wins
-  NC/TX.
-- **Ossoff vs Vance · D+5** — *hypothetical for fun*: the 2020 vote map but with
-  a 5-point Democratic swing, relabeled as Jon Ossoff vs JD Vance.
-- **AOC vs Vance · D+5** — same favorable-D environment, relabeled AOC vs Vance.
+  everywhere (it *is* 2020 vs 2020). Biden wins GA/PA/AZ/NV/WI/MI; Trump wins NC/TX.
+- **Ossoff vs Vance · D+5** / **AOC vs Vance · D+5** — *hypotheticals for fun*: the
+  2020 vote map with a 5-pt Democratic swing, relabeled candidates.
+- **TEST · +4% big-county turnout, by ballot type** — NEW: the 2 biggest counties per
+  state get ~4% more votes; votes split into mail/early/election-day buckets, and
+  **mail (D-leaning) reports late** → you watch the **red-mirage → blue-shift** live.
+  Pair it with the County Insight box (Panel 11) for the full effect.
 
 **Senate:**
 - **True (most-recent real results)**
