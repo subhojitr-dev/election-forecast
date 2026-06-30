@@ -13,19 +13,20 @@
 ## 🚦 WHERE WE ARE RIGHT NOW
 
   Phases 0–6  ✅ COMPLETE   ETL · ingestor · analytics · API/WS · React UI · integration test
-  Phase 7     🔄 IN PROGRESS  Deploy to a public URL
-     ├─ Backend  ✅ **LIVE on Render** → https://election-forecast.onrender.com
-     └─ Frontend ⬜ PENDING (Vercel — USER action, see NEXT below)
+  Phase 7     ✅ DEPLOYED — dashboard is PUBLIC (one small CORS step left)
+     ├─ Frontend ✅ LIVE on Vercel → https://election-forecast-silk.vercel.app
+     └─ Backend  ✅ LIVE on Render → https://election-forecast.onrender.com
 
 ### 🔴 NEXT SESSION — START HERE
-The backend is deployed + serving (verified: /api/health = ok, 771,834 rows; all 7
-elections; cache headers live). The ONLY remaining deploy step is the **frontend on
-Vercel**:
-  - USER does: vercel.com/new → import `election-forecast` → **Root Directory = `ui`**
-    → add env var `VITE_API_BASE=https://election-forecast.onrender.com` → Deploy.
-  - THEN: on Render → Environment → add `CORS_ORIGINS=<the-vercel-url>` (locks CORS).
-  - If already done: get the Vercel URL and verify the dashboard ↔ backend end-to-end.
-After that, Phase 7 is complete and the next focus is LIVE-READINESS (see pending list).
+The dashboard is **deployed and public** — frontend ↔ backend verified working
+(deployed from main commit 1a054b7; backend /api/health ok, 771,834 rows, 7 elections,
+cache headers live). Two quick wraps, then the focus shifts to LIVE-READINESS:
+  - (small) **Lock down CORS** (if not done): Render → service → Environment → add
+    `CORS_ORIGINS=https://election-forecast-silk.vercel.app` → save (auto-redeploys).
+    Until then the API accepts any origin (works, just not locked).
+  - Then the main focus is **LIVE-READINESS for Nov 3** (pending list below).
+Reproducible deploy steps + URLs: **DEPLOY.md → "✅ AS-BUILT"**. ⚠️ Render free tier
+spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads the 43 MB DB).
 
 ### 🚀 Deployment facts (so you don't re-derive them)
   - **GitHub:** github.com/subhojitr-dev/election-forecast (branch `main`). Data (CSVs +
@@ -41,7 +42,8 @@ After that, Phase 7 is complete and the next focus is LIVE-READINESS (see pendin
   - **Local dev still works** unchanged (2 terminals, below) — `VITE_API_BASE` unset = relative.
 
 ### 📋 WHAT'S PENDING (priority order)
-  1. **Frontend deploy on Vercel + CORS lockdown** (USER — the immediate next step, above).
+  1. ✅ **Frontend DEPLOYED on Vercel** (election-forecast-silk.vercel.app). Small
+     remaining: CORS lockdown on Render (above).
   2. **LIVE-READINESS for Nov 3** (the long pole; time-gated by the July/Aug primaries) —
      a. Feed audit round 2 vs LIVE primaries: **AZ Jul 21 · MI Aug 4 · WI Aug 11** (FEED_AUDIT.md).
      b. Beat the **Clarity 403** (Issue #1).

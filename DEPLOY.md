@@ -1,7 +1,57 @@
 # DEPLOY.md — Phase 7 deployment plan
 
-How to put the dashboard on a public URL. **Today it runs locally (two terminals);
-Phase 7 makes it reachable + able to scale for election night.**
+How to put the dashboard on a public URL. The reference plan is below; the
+**AS-BUILT record (the exact steps that worked)** is first.
+
+---
+
+## ✅ AS-BUILT — live deployment (done 2026-06-30)
+
+| Piece | URL |
+|-------|-----|
+| **Frontend (Vercel)** | **https://election-forecast-silk.vercel.app** |
+| **Backend (Render)** | **https://election-forecast.onrender.com** |
+| **GitHub repo** | github.com/subhojitr-dev/election-forecast (branch `main`) |
+| **DB (GitHub Release)** | tag `db-v1`, asset `baseline.db.gz` (43 MB) |
+
+### A. Backend on Render (do this FIRST — frontend needs its URL)
+1. **render.com** → Sign up **with GitHub** → in the GitHub-app prompt, choose
+   **Only select repositories → `election-forecast`** → Install.
+2. **New + → Web Service** → pick the repo. Render auto-detects the **Dockerfile**
+   (Environment = Docker). Instance type = **Free**.
+3. **The database (217 MB, NOT in Git):** uploaded gzipped (43 MB) as a **GitHub
+   Release** (Releases → Draft new release → tag `db-v1` → attach
+   `data/db/baseline.db.gz` → Publish). On boot, `entrypoint.sh` → `download_db.py`
+   pulls it via the `DB_URL` env var and unzips to `data/db/`.
+4. **Environment variable** → add `DB_URL =
+   https://github.com/subhojitr-dev/election-forecast/releases/download/db-v1/baseline.db.gz`
+   (CORS_ORIGINS optional — defaults to `*`).
+5. **Deploy.** Logs show `[db] baseline.db ready (226,824,192 bytes)` → uvicorn up →
+   "service is live". Verify: `…onrender.com/api/health` → `{"status":"ok",…}`.
+
+### B. Frontend on Vercel
+1. **vercel.com/new**. If `election-forecast` isn't in the import list, click
+   **"Adjust GitHub App Permissions"** → add the repo → Save. Then **Import** it
+   (⚠️ NOT the immigration repo).
+2. ⚠️ Vercel first auto-detects the **backend** (FastAPI / Root `./`) — FIX BOTH:
+   - **Root Directory → Edit → `ui`** (the Vite/React folder; it shows the Vite logo).
+   - **Application Preset** then flips to **Vite** (set it manually if not).
+3. **Environment Variables** → `VITE_API_BASE =
+   https://election-forecast.onrender.com`.
+4. **Deploy** → production URL appears under **Overview → Domains**
+   (here: `election-forecast-silk.vercel.app`).
+
+### C. Lock down CORS (the one remaining step)
+On Render → service → **Environment** → add
+`CORS_ORIGINS = https://election-forecast-silk.vercel.app` → save (auto-redeploys).
+Until then the API accepts any origin (`*`), so the site already works.
+
+### Operating notes
+- **Render free tier spins down after ~15 min idle** → first visit then takes
+  ~30–60 s (cold start re-downloads the 43 MB DB). For election night → Starter
+  ($7/mo) + a persistent disk mounted at `data/db/`.
+- **Updating the app:** push to `main` → both Vercel and Render auto-redeploy.
+- **Updating the DB:** re-gzip `baseline.db`, upload a NEW release asset, update `DB_URL`.
 
 ---
 
