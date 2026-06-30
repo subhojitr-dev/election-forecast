@@ -1,9 +1,8 @@
 # CONTEXT.md — START HERE EACH SESSION
 # Election Forecast Dashboard — current-state snapshot
-# Last updated: 2026-06-28 (GA Senate = Jan-2021 runoff; "GA Special" Warnock view;
-#                           convergence chart polish; county-grain reveal fix;
-#                           ballot-mode buckets + turnout scenario + County Insight;
-#                           election ballot manifest = date-aware race dropdown)
+# Last updated: 2026-06-30 (DEPLOYED & PUBLIC — Vercel + Render; GA runoff baseline +
+#                           Issue #7 fix; "GA Special" view; ballot-mode buckets +
+#                           County Insight; election ballot manifest; convergence polish)
 
 > This is the fast on-ramp. Read this first, then `HANDOVER_BRIEF.md` for the
 > full spec. `PROGRESS.md` = chronological log. `Issues.md` = problems + plans.
@@ -98,13 +97,15 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
                           replay+analytics demo
   New table: `live_snapshots` (per-poll statewide series → trend chart Panel 5)
 
-**API (Phase 4)** — `api/` (`main.py`, `db.py`):
-  - GET /api/health · /api/states?race= (strip+EV) · /api/state/{abbr}?race=
-    (full bundle) · /api/state/{abbr}/series?race= · WS /ws?race=
-  - Run:  uvicorn api.main:app --reload --port 8000   → http://localhost:8000/docs
+**API** — `api/` (`main.py`, `db.py`, `elections.py`, `simulation.py`):
+  - /api/health · /api/elections · /api/states?race=&election= ·
+    /api/state/{abbr}?race=&election= · /api/state/{abbr}/county/{cty} (note+modes) ·
+    /api/state/{abbr}/series · /api/scenarios · /api/sim/{reset,next,status} · WS /ws
+  - Run:  uvicorn api.main:app --port 8000   → http://localhost:8000/docs  (no --reload)
 
 **UI (Phase 5)** — `ui/` (Vite + React + Recharts):
-  - All 10 panels in `ui/src/components/`; `App.jsx` polls the API every 5s.
+  - Panels in `ui/src/components/` (incl. CountyInsight); `App.jsx` polls every 10s;
+    Election dropdown + dynamic RaceToggle; `api.js` uses VITE_API_BASE (prod).
   - Vite proxies /api + /ws to :8000 (see ui/vite.config.js).
   - Run: `cd ui && npm run dev` → http://localhost:5173 (needs the API running).
   - .claude/launch.json (in C:\Users\subho) registers it for the preview tool.
@@ -122,20 +123,22 @@ Re-populate any race: python analytics/engine.py <ST> <race> <year> [swing] [noi
   AZ, MI, TX  → 2018 + 2020 + 2024
   GA, NC      → 2020   (GA also has 2021; see below)
   NV, PA, WI  → 2018 + 2024   (PA/NV/WI had NO 2020 Senate race)
-  GA Senate baseline USED = 2021 Jan-5 RUNOFF (county-level, 155/159 cty — Issue #7),
-    loaded via ingestor/etl_ga_runoff_2021.py: regular→'senate', special→'senate_special'.
+  GA Senate baseline USED = 2021 Jan-5 RUNOFF (county-level, **159/159 cty, exactly
+    certified** — Issue #7 RESOLVED via estimate-fill), loaded via
+    ingestor/etl_ga_runoff_2021.py: regular→'senate', special→'senate_special'.
     Ossoff WON the runoff (Nov general went under GA's 50% rule) and his seat is up
     2026, so the runoff is the right baseline. The 2020 Nov-general GA rows are kept
-    (just unused for GA). SENATE_BASELINE["GA"]=2021 in api/main.py.
+    (just unused for GA).
+  ⚠️ Baselines + per-ballot races now come from the ELECTION MANIFEST **api/elections.py**
+    (it REPLACED the old SENATE_BASELINE / SENATE_SPECIAL_BASELINE / RACE_STATES dicts).
   NEW — "GA Special" race view (race_type=senate_special): the Warnock vs Loeffler
-    Jan-2021 runoff as a GA-ONLY race (3rd toggle in the UI). RACE_STATES limits it
-    to GA; SENATE_SPECIAL_BASELINE["GA"]=2021. ReplayFeed auto-uses whole-county
-    reveal for county-grained data (GA senate/senate_special) so % steps 20/40/60/
-    80/100 smoothly (proportional mode was jumpy with 1 precinct/county).
+    Jan-2021 runoff as a GA-ONLY race (3rd toggle in the UI). ReplayFeed auto-uses
+    whole-county reveal for county-grained data (GA senate/senate_special) so % steps
+    20/40/60/80/100 smoothly (proportional mode was jumpy with 1 precinct/county).
 
 ---
 
-## 🔑 KEY DECISIONS MADE (this session)
+## 🔑 KEY DECISIONS MADE (foundational — see PROGRESS.md for the full history)
   - QA tolerance ±0.1% per candidate (MIT precinct data ≠ exact certified).
   - Added 2024 President as secondary reference (chosen over 2016).
   - Added 2018 Senate (TX Cruz–O'Rourke) + 2024 Senate (fills PA/NV/WI).
