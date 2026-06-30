@@ -8,13 +8,26 @@ current win probability — an open, precinct-level version of the "election nee
 > New here? Read **`DASHBOARD_GUIDE.md`** (how to read/use it) and **`CONTEXT.md`**
 > (current project state). Full spec: `HANDOVER_BRIEF.md`.
 
-## 🚀 Deployed
-- **Backend (live):** https://election-forecast.onrender.com (Render). Try
-  `/api/health`, `/docs`, or `/api/states?race=president&election=demo`.
-- **Frontend:** Vercel — pending (deploy the `ui/` folder with `VITE_API_BASE`=the
-  Render URL). Full plan + caching + scaling: **`DEPLOY.md`**.
-- **Source:** github.com/subhojitr-dev/election-forecast (the 1.4 GB of data is
-  gitignored — see `DATA_SETUP.md` to obtain/rebuild it).
+## 🔗 Important URLs
+
+**Live (remote hosting):**
+| What | URL |
+|------|-----|
+| **Dashboard — the public site** | **https://election-forecast-silk.vercel.app** |
+| API (backend) | https://election-forecast.onrender.com · health `/api/health` · docs `/docs` |
+| Source code (GitHub) | https://github.com/subhojitr-dev/election-forecast |
+| Database asset (GitHub Release) | https://github.com/subhojitr-dev/election-forecast/releases/tag/db-v1 |
+| Frontend host (Vercel) | https://vercel.com/subhojitr-devs-projects/election-forecast |
+| Backend host (Render) | https://dashboard.render.com → service `election-forecast` |
+
+**Local (your machine):**
+| What | URL |
+|------|-----|
+| **Dashboard** — the only one you open | **http://localhost:5173** |
+| API | http://localhost:8000 · docs http://localhost:8000/docs |
+
+The 1.4 GB of data (CSVs + `baseline.db`) is gitignored — see `DATA_SETUP.md` to obtain/rebuild it.
+Full deployment guide (steps, caching, scaling): **`DEPLOY.md`**.
 
 ---
 
@@ -102,6 +115,44 @@ npm run dev
 **"Port already in use" (Errno 10048)?** Something is still running on that port —
 use the matching `Get-NetTCPConnection … Stop-Process` line above to free it, then
 start again.
+
+---
+
+## Deploying (remote — Vercel + Render)
+
+**The app auto-deploys: just `git push` to `main`.** Both hosts watch the repo —
+**Vercel** rebuilds the `ui/` frontend, **Render** rebuilds the Docker backend.
+
+```powershell
+# from the project root — commit + push; both hosts redeploy automatically (~1–2 min)
+git add -A
+git commit -m "your message"
+git push origin main
+```
+
+Manual redeploy (no code change), if ever needed:
+- **Render:** dashboard → service → **Manual Deploy** → "Deploy latest commit".
+- **Vercel:** project → **Deployments** → ⋯ on the latest → **Redeploy**.
+
+First-time setup (already done) + the gotchas → **`DEPLOY.md` → "✅ AS-BUILT"**.
+If you change the database, re-gzip `baseline.db`, upload a new GitHub Release asset,
+and update the `DB_URL` env var on Render (details in `DEPLOY.md`).
+
+---
+
+## 🪵 Where to find logs / errors
+
+| If the problem is… | Look here |
+|--------------------|-----------|
+| **Live API errors / won't start** | Render → service `election-forecast` → **Logs** (left sidebar). Look for `[db] baseline.db ready (…)` then `Uvicorn running`; missing = bad `DB_URL` or missing Release asset. |
+| **Frontend build errors (Vercel)** | Vercel → project → **Deployments** → click the build → **Build Logs**. |
+| **Site loads but shows no data** | Browser **DevTools → Console / Network** (press F12). A failed `/api/…` call usually = backend asleep (free-tier cold start — wait ~60s and refresh) or a CORS block. The page also shows a red "API error" banner. |
+| **Local API errors** | The **Terminal 1** (uvicorn) window — prints tracebacks + each request. |
+| **Local UI errors** | The **Terminal 2** (Vite) window + the browser **Console**. |
+| **What changed / known issues** | `PROGRESS.md` (history) · `Issues.md` (problems + fixes). |
+
+**Quick health check:** open `…onrender.com/api/health` (live) or `localhost:8000/api/health`
+(local). `{"status":"ok",…}` means the API + database are fine.
 
 ---
 
