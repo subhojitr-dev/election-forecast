@@ -1,8 +1,8 @@
 # CONTEXT.md — START HERE EACH SESSION
 # Election Forecast Dashboard — current-state snapshot
-# Last updated: 2026-06-30 (DEPLOYED & PUBLIC — Vercel + Render; GA runoff baseline +
-#                           Issue #7 fix; "GA Special" view; ballot-mode buckets +
-#                           County Insight; election ballot manifest; convergence polish)
+# Last updated: 2026-07-06 (LIVE-READINESS underway — CORS locked; NC + GA WIRED
+#                           END-TO-END (2 live states); AZ mapped; Clarity confirmed
+#                           dead; Playwright installed; plan: PA/TX/NV → SC → MI → WI)
 
 > This is the fast on-ramp. Read this first, then `HANDOVER_BRIEF.md` for the
 > full spec. `PROGRESS.md` = chronological log. `Issues.md` = problems + plans.
@@ -15,15 +15,55 @@
   Phase 7     ✅ DEPLOYED — dashboard is PUBLIC (one small CORS step left)
      ├─ Frontend ✅ LIVE on Vercel → https://election-forecast-silk.vercel.app
      └─ Backend  ✅ LIVE on Render → https://election-forecast.onrender.com
+  ⚠️ URL GOTCHA (resolved 2026-07-02): OUR site is **election-forecast-SILK**.vercel.app.
+     The bare `election-forecast.vercel.app` is a DIFFERENT, unrelated project (a
+     national 2026 House forecast w/ US district map) that took the name first — NOT
+     ours. Our app is the 8-swing-state President/Senate simulator; it has NO House,
+     no all-50-states, no US map (verified: no map lib installed). Don't confuse them.
 
-### 🔴 NEXT SESSION — START HERE
-The dashboard is **deployed and public** — frontend ↔ backend verified working
-(deployed from main commit 1a054b7; backend /api/health ok, 771,834 rows, 7 elections,
-cache headers live). Two quick wraps, then the focus shifts to LIVE-READINESS:
-  - (small) **Lock down CORS** (if not done): Render → service → Environment → add
-    `CORS_ORIGINS=https://election-forecast-silk.vercel.app` → save (auto-redeploys).
-    Until then the API accepts any origin (works, just not locked).
-  - Then the main focus is **LIVE-READINESS for Nov 3** (pending list below).
+### 🔴 NEXT SESSION — START HERE  →  LIVE-READINESS (state ingestors)
+
+**Status: 2 of 8 states WIRED END-TO-END + validated.** Dashboard is deployed/public;
+CORS locked. The work now = building each state's live feed → results_live so the
+analytics run unchanged on election night.
+
+**How live ingestion works (the proven pattern):**
+  - County-level data is stored as **county-pseudo-precincts** keyed `{ST}-{fips}-CTY`.
+    The analytics engine is precinct-keyed, so if BOTH the baseline and the live feed
+    use the same `{ST}-{fips}-CTY` ids, shift / win-prob / county table all "just work"
+    with **zero core-code changes**.
+  - A `*_live_feed.py` script fetches the state's live source, maps to `{ST}-{fips}-CTY`,
+    and writes results_live. ⚠️ It MUST `DELETE ... WHERE precinct_id LIKE '{ST}-%'`
+    first (not just `-CTY`) — leftover precinct-level rows from sims/tests double-count.
+
+**DONE (live + validated to the exact certified result):**
+  - ✅ **NC** — open S3 bulk file (`nc_ingestor.py` + `nc_live_feed.py` +
+    `etl_nc_county_baseline.py`). Plain httpx, no bot-block. **Has live ballot-mode
+    breakdown** (election-day/early/mail/provisional). 100 counties.
+  - ✅ **GA** — open Enhanced Voting API (`ga_live_feed.py`). Plain httpx (Playwright only
+    to DISCOVER the endpoint). Totals only (mode='all'; API exposes no live mode split).
+    159 counties. Baseline = 2021 runoff county-pseudo (already loaded).
+
+**THE PLAN (in order):**
+  1. **PA, TX, NV** next — likely easy/GA-style (map endpoint → wire like GA). Doable NOW.
+  2. **SC** — if it's easy like GA/NC, add it here too (Class-2 Graham seat; enr-scvotes.org).
+  3. **MI** — take a real run BEFORE **Aug 4** primary (de-risk). Headless Playwright was
+     BLOCKED by Cloudflare; try non-headless/stealth OR find an open bulk-download.
+  4. **WI** — hardest (no statewide feed; 72 county sites / AP). Research approach anytime;
+     validate at **Aug 11** primary. May need a pragmatic compromise (aggregator / subset).
+  - **AZ** — already MAPPED (open `cdn1.arizona.vote` + Cloudflare SPA); VALIDATE at the
+    **Jul 21** primary (that's the only way to test live real-time behavior).
+
+**Playwright** (installed): drives a real Chrome to (a) DISCOVER hidden data endpoints on
+JS/SPA sites and (b) pass Cloudflare "Just a moment…" guards. Needed ONGOING only where
+the data endpoint itself is locked — so far just **MI**. NC/GA/AZ data is open (plain httpx);
+Playwright there was one-time discovery only. **Clarity ENR = DEAD** (states moved to
+Enhanced Voting; the old 403 endpoint is decommissioned, not a beatable block — don't chase it).
+
+**Timing rule:** access/discovery work is best done NOW (de-risks hard states, leaves time
+for plan B); live real-time VALIDATION can ONLY happen at each primary. Easy states (open
+data) = fully buildable + testable now against archives.
+
 Reproducible deploy steps + URLs: **DEPLOY.md → "✅ AS-BUILT"**. ⚠️ Render free tier
 spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads the 43 MB DB).
 

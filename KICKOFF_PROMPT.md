@@ -10,32 +10,30 @@
 # ========================= START COPY HERE =========================
 
 I am building an Election Forecast Dashboard. This is a multi-day project
-and we are picking up where we left off.
+and we are picking up where planning left off. 
 
-Please start by reading these files in the current directory, in order:
-  1. CONTEXT.md          — current-state snapshot (where we are, what's next)
-  2. HANDOVER_BRIEF.md   — full spec (10 UI panels, intelligence/probability
-                           model, data sources, schema, tech stack, 6-phase plan)
-Then skim, as needed:
-  PROGRESS.md (chronological log) · Issues.md (problems + Nov-3 plan)
+Please start by reading this file in the current directory:
+  HANDOVER_BRIEF.md
 
-Read CONTEXT.md and HANDOVER_BRIEF.md completely before doing anything else.
-Then come back and confirm you have read them by summarizing:
+It contains the full project context including: what we are building,
+who uses it, all 10 UI panels, the intelligence/probability model,
+data sources, database schema, tech stack, and 6-phase build plan.
+
+Read it completely before doing anything else. Then come back and
+confirm you have read it by summarizing:
 1. What the dashboard does in one sentence
 2. The 3 data sources we are using
-3. Which Phase is complete and which Phase we are resuming today
+3. What Phase we are starting today
 4. What the end state of today looks like
 
-Once you confirm understanding, propose the plan for the current Phase and
-proceed once I give the go-ahead.
+Once you confirm understanding, proceed with today's phase as described
+in HANDOVER_BRIEF.md under the current Phase section.
 
 Important rules for this session:
 - Tell me what you find at each step BEFORE moving to the next one
-- Do not advance to the NEXT Phase without my explicit go-ahead
+- Do not skip ahead to the next Phase without my explicit go-ahead
 - If any file or column name is ambiguous, read the codebook first
 - Print progress to console as scripts run so I can see activity
-- After any script runs, verify the output with an independent query or check
-- When a Phase finishes: update its status in HANDOVER_BRIEF.md AND CONTEXT.md,
-  add a PROGRESS.md entry, and log any problems/workarounds in Issues.md
+- After any script runs, verify the output with a query or check
 
 # ========================== END COPY HERE ==========================

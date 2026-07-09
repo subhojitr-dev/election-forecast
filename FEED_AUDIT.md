@@ -14,13 +14,13 @@ unknowns into a checklist now. Started 2026-06-28. Pairs with PREP.md.
 
 | State | Live ENR system | Scope | URL | Mode breakdown live? | Ingestor | Status |
 |-------|-----------------|-------|-----|----------------------|----------|--------|
-| **GA** | **Clarity** (Scytl) | statewide | results.enr.clarityelections.com/GA | ✅ yes (runoff file has the cols) | ✅ parser built | strongest |
+| **GA** | **Enhanced Voting** (moved off Clarity!) | statewide + per-county | **results.sos.ga.gov** · state `/api/elections/Georgia/{EID}/data`, county `/api/elections/{county-shortName}/{EID}/data` (both OPEN, plain httpx) | mode='all' only (no live split found; totals only) | ✅ **WIRED END-TO-END 2026-07-06** (ga_live_feed.py) | **strong** |
 | **NC** | **Own — NCSBE dashboard** | statewide, ~5–10 min | er.ncsbe.gov | ✅ **yes — "Results by Voting Method" tab** | build (clean) | **best-case** |
-| **AZ** | **Own — AZ SoS** | statewide + county sites | results.arizona.vote | ⚠️ to confirm (AZ reports early/mail first) | build | medium |
+| **AZ** | **Own — AngularJS SPA + open CDN** | statewide + county | results.arizona.vote (SPA) → data on **cdn1.arizona.vote** | ⚠️ to confirm | build (2 open paths) | **mapped 2026-07-06** |
 | **NV** | **Own — NV SoS** | statewide | Results.NV.gov · nvsos.gov/electionresults | ⚠️ to confirm | build | medium |
 | **PA** | **Clarity** (Scytl) | county-by-county | results.enr.clarityelections.com/PA/<county> | likely (per-county) | per-county discovery | medium |
 | **TX** | **Clarity** (Scytl) | county-by-county | results.enr.clarityelections.com/TX/<county> | varies by county | per-county discovery | medium |
-| **MI** | **Clarity** (counties) + MI SoS | county + state | results.enr.clarityelections.com/MI/<county> | absentee (AV) reported | per-county discovery | medium |
+| **MI** | MI SoS (mvic) — Cloudflare; old systems dead | county + state | mvic.sos.state.mi.us (Cloudflare) · michigan.gov/sos (Akamai) | ⚠️ | **harder** — headless Playwright BLOCKED by Cloudflare (2026-07-06); needs non-headless/stealth OR find open bulk-download OR per-county EV | **hard** |
 | **WI** | ⚠️ **NONE statewide** | 72 county clerk sites | elections.wi.gov/wisconsin-county-election-websites | ❌ minimal live | **hardest** — scrape 72 sites or use an aggregator (AP) | **risk** |
 
 ---

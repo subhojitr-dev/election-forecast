@@ -5,6 +5,133 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-07-06 (cont.) — GA WIRED END-TO-END ✅ (2nd live state)
+
+`ingestor/ga_live_feed.py`: reads GA's OPEN Enhanced Voting API — state feed lists
+159 counties (childLocalities), then fetches each county's `/api/elections/
+{county-shortName}/{EID}/data` (in parallel, 16 workers) → summaryResults.
+ballotOptions (candidate + voteCount; party parsed from name suffix "(Rep)"/"(Dem)").
+Maps to GA-{fips}-CTY (the 2021-runoff county-pseudo precincts already in the DB) →
+results_live. Clears ALL GA-% live rows first (same leftover-contamination bug as NC).
+Validated end-to-end: GA 2024 President → 159/159 counties, D 2,548,017 / R 2,663,117
+(48.9%), shift -0.00, P(D) 1% Safe R (Trump won ✓), Fulton 535,238 D72.7% ✓.
+LIMITATION: Enhanced Voting summaryResults gives TOTALS only (no live mode split) →
+GA mode='all' (NC has the real mode breakdown; GA doesn't expose it here). Election
+night: ga_live_feed with the 2026 EID + "US Senate" contest → GA-CTY → matches the
+2021 senate county-pseudo baseline (already loaded) → analytics work. Feed proven vs
+President; senate = same feed, different contest filter. TWO states now fully live: NC, GA.
+NOTE: added a demo GA president-2024 county-pseudo baseline to run the analytics test
+(local baseline.db only). Per-county fetch = 159 requests/poll (parallelized; consider
+caching/throttle for prod).
+
+---
+
+## 2026-07-06 (cont.) — GA CRACKED + MI/WI recon + roadmap
+
+**GA (was Clarity → now Enhanced Voting; CRACKED):** GA moved off the dead Clarity
+endpoint to Enhanced Voting. Results at **results.sos.ga.gov**; data API
+`results.sos.ga.gov/results/public/api/elections/Georgia/{EID}/data` is **OPEN to
+plain httpx** (200, ~900KB JSON) despite Cloudflare on the page. EIDs human-readable
+(2024NovGen, 2024MayGenPri...). JSON: jurisdiction.childLocalities (159 counties +
+%reporting), ballotItems[].summaryResults.ballotOptions (candidate name + voteCount).
+Validated: GA 2024 President Trump 2,663,117 / Harris 2,548,017 (matches certified).
+Statewide is clean; per-county VOTE breakdown = one more endpoint to map (per-locality
+call) — small follow-up. GA is strong; wire it end-to-end next (like NC).
+**MI (Aug 4 primary):** MI SoS results at michigan.gov/sos/elections/election-results-
+and-data + mvic.sos.state.mi.us (by county/precinct); downloadable county data exists.
+Needs a focused mapping pass to find the live machine-readable endpoint; validate Aug 4.
+**WI (Aug 11) — confirmed HARDEST:** NO statewide unofficial-results feed. Live numbers
+come from 72 county clerk sites, AP-aggregated. elections.wi.gov posts only CERTIFIED
+(weeks later). Options: AP feed ($, we're skipping AP), 72 county scrapers, or an
+aggregator. Decide least-bad at the Aug 11 primary.
+
+---
+
+## 2026-07-06 (cont.) — AZ architecture MAPPED (via Playwright)
+
+AZ = own system. `results.arizona.vote` is a **Cloudflare-protected AngularJS SPA**
+(plain httpx → "Just a moment" 403; Playwright's real browser passes the JS
+challenge). BUT the actual DATA is on a SEPARATE **open CDN `cdn1.arizona.vote`**
+(S3-style, plain httpx works — no Cloudflare). URL template (seen in the SPA's
+network calls): `cdn1.arizona.vote/data/{date}/{id}/election_{date}_{id}.json`
+(+ tabs_{..}_en.json, translation_en.json). IDs are blank right now (no active
+election → 404s). Second path: **azsos.gov FTP/HTTPS XML press feed**
+(ftp.azsos.gov/ElectionResults — SUMMARY county+state + PRECINCT DETAIL).
+So AZ = "open data behind a fancy front-end", like NC. PLAN: on Jul 21, Playwright
+ONCE to grab the current election's date/id from the SPA, then plain httpx-poll the
+open CDN JSON (or the FTP XML) → parse county-level. Can't fully build+validate the
+fetcher until a real election exists (Jul 21 primary) — no active/locatable AZ
+election data right now. Playwright now proven useful (passes Cloudflare).
+
+---
+
+## 2026-07-06 (cont.) — NC WIRED END-TO-END ✅ (first live state, validated)
+
+NC now works through the full pipeline — with NO core-code changes (safe for prod;
+baseline.db is gitignored, prod uses the released copy). Three new files in ingestor/:
+- `nc_ingestor.py` — reads NCSBE open S3 file `results_pct` (handles NC's early-vote
+  column rename: "One Stop" ≤2020 → "Early Voting" 2024+). County-level, by mode.
+- `etl_nc_county_baseline.py` — aggregates NC's 2020 Senate precinct baseline into
+  county-pseudo-precincts `NC-{fips}-CTY` (the GA-runoff pattern) and REMOVES the
+  precinct-level 2020 Senate rows (county-level v1). Idempotent. Ran it: 100 counties.
+- `nc_live_feed.py` — NCSBE → results_live as `NC-{fips}-CTY`, per ballot mode;
+  clears all NC-% live rows first (avoids leftover-sim contamination).
+Validated: ingested real NC 2020 Senate → analytics show 100/100 counties, D 2,569,965 /
+R 2,665,598 (49.1%), shift +0.00 (live 2020 == baseline, exactly consistent), P(D) 3%
+Likely R (Tillis won ✓), ballot modes election-day D34% / early D47% / mail D70% /
+provisional D45% (the County Insight red-mirage signal). Election night = point
+nc_live_feed at the Nov-2026 date + "US SENATE" on a schedule (replaces Next Batch).
+Two bugs found+fixed en route: (1) DELETE too narrow → leftover precinct-level NC rows
+polluted totals; (2) 2020 "One Stop" vs 2024 "Early Voting" column name.
+NOTE: modified baseline.db (NC Senate → county-level). Local only; to restore precinct-
+level, re-run etl_baseline. NEXT: Task 2 = Playwright to crack Clarity (GA/PA/TX/MI).
+
+---
+
+## 2026-07-06 — Live-readiness kickoff: CORS ready, Clarity 403 diagnosed, NC ingestor BUILT
+
+Started the critical-path work (ahead of the Jul 9 plan).
+- **CORS (Task 1):** code already reads `CORS_ORIGINS` env (defaults *). Only a
+  user action left: set `CORS_ORIGINS=https://election-forecast-silk.vercel.app`
+  on Render → auto-redeploys. No code change needed.
+- **Clarity 403 (Task 2):** DIAGNOSED (see Issues #1 update). It's AWS CloudFront,
+  NOT a bot-block — `elections.json` returns 200 to a plain request; the old data
+  paths 403 for everyone incl. curl_cffi browser-TLS. Modern Clarity moved to new
+  JSON endpoints. Next: Playwright network-capture to map them. NOT solved yet.
+- **NC ingestor (Task 3): ✅ BUILT + VALIDATED.** `ingestor/nc_ingestor.py` fetches
+  NCSBE's OPEN S3 file `dl.ncsbe.gov/ENRS/{date}/results_pct_{date}.zip` (tab-
+  delimited, statewide, precinct-level, already split by voting method: election_
+  day/early/mail/provisional). Aggregates to COUNTY level. Test vs 2024 President:
+  100 counties, R 51.6% / D 48.4% (Trump wins NC) — matches certified exactly.
+  NC has NO CloudFront/403 problem. NC 2026 primary data exists at ENRS/2026_03_03/.
+  TODO next: wire into results_live via the GA-runoff county-as-pseudo-precinct
+  pattern + point at the NC 2026 Senate contest name.
+
+---
+
+## 2026-07-02 — Resolved the "Vercel looks totally different" confusion (no code changes)
+
+Fresh session. User reported `election-forecast.vercel.app` looked completely different
+from `localhost:5173` — a national 2026 House forecast with a US district map, seat
+distribution, and House-race tables — and asked "how did we build this?"
+
+**Root cause (investigated read-only): it's NOT our app.** Our deployed frontend is
+**election-forecast-SILK.vercel.app** (Vercel appended "-silk" because the plain name was
+already taken). The bare **election-forecast.vercel.app** is a DIFFERENT, unrelated
+project that grabbed the name first. Evidence: our code has NO "house" references, NO map
+library (ui deps = axios/react/recharts only), and only the 8 swing states. So the user
+had been comparing our swing-state Pres/Senate app against a stranger's national House app.
+
+Also clarified: the local code IS in sync with our real deploy (`main` == `origin/main`,
+only KICKOFF_PROMPT.md uncommitted); a "simpler" localhost was just a stale/older view.
+
+**No files changed** (per user instruction — investigate only). Recorded the URL gotcha in
+CONTEXT.md + memory so it never causes confusion again. User to verify at the -silk URL.
+Open question for next session: user may want a real national House+map view built — that
+would be a large NEW project (new data + a map library), not a toggle to something existing.
+
+---
+
 ## 2026-06-29 — Backend DEPLOYED LIVE on Render (Phase 7 in progress)
 
 - **Backend is live → https://election-forecast.onrender.com** (Render Docker web service,

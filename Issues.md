@@ -8,6 +8,36 @@ Status legend: 🔴 OPEN · 🟡 WORKED AROUND (not fully solved) · 🟢 RESOLV
 ## ISSUE #1 — Clarity CDN returns HTTP 403 to programmatic requests
 **Logged:** 2026-06-25 (Phase 2) · **Status:** 🟡 WORKED AROUND for development; 🔴 OPEN for production
 
+### 🔬 UPDATE 2026-07-06 — DIAGNOSED (earlier "anti-scraping" call was WRONG)
+Re-tested carefully. The server is **AWS CloudFront** (not nginx). Findings:
+- `https://results.enr.clarityelections.com/GA/elections.json` → **200 with a
+  PLAIN request** (we CAN discover every GA election + its EID this way).
+- The old data paths (`/GA/{EID}/current_ver.txt`, `.../reports/detailxml.zip`)
+  → **403 for everyone**, including: full browser headers AND **`curl_cffi` with
+  a byte-identical Chrome TLS fingerprint**. So it is **NOT a User-Agent / header
+  / TLS bot-block.**
+- Conclusion: **modern Clarity moved its data to new (JSON) endpoints;** the old
+  paths no longer exist and CloudFront answers a dead path with 403 (not 404).
+  So the task is **"find the new URLs," not "beat a guard."**
+- **Next step:** drive a real headless browser (**Playwright**) at a live GA
+  results page and capture the network calls to map the modern
+  `/{ST}/{EID}/{version}/json/...` scheme + version discovery. (~150 MB install.)
+- **NC does NOT have this problem** — NCSBE serves open S3 files (see nc_ingestor
+  below); that's why we built NC first. **NC is now WIRED END-TO-END (2026-07-06).**
+
+### 🔬 UPDATE 2026-07-06b — Playwright test: even a real browser gets 403
+Installed Playwright, loaded `results.enr.clarityelections.com/GA/121813/` in a
+real headless Chromium: **403, page never loaded, no SPA, zero data requests.**
+So it is NOT a scripting/bot-block at all — a genuine browser can't load the bare
+path either. Conclusion: the old Clarity ENR endpoint is **dead/decommissioned for
+GA** (its `elections.json` also stops at mid-2024). **REFRAMED:** "beat the 403" is
+the wrong goal. The real task is **per-state discovery of each state's CURRENT
+live-results system** — exactly like we did for NC. Next: find where GA / PA / TX /
+MI publish results NOW (GA SoS portal, etc.), and whether the modern Clarity lives
+at a new domain (Enhanced Voting acquired Scytl/Clarity). Test against the summer
+primaries (AZ Jul 21 first). The whole "Clarity 403" framing is effectively OBSOLETE.
+
+
 **What happened**
 When trying to fetch real Clarity ENR data from
 `results.enr.clarityelections.com` directly from Python, every request returned
