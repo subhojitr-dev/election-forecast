@@ -19,6 +19,8 @@ data\db\baseline.db            SQLite — created by ETL on Day 1
 ## 🗺️ Target States
 Georgia, Pennsylvania, Arizona, Nevada, Wisconsin, Michigan,
 North Carolina, Texas (Talarico 2026 bonus)
++ **South Carolina** (added 2026-07-17 — a 9th state, NOT part of the original 8; Graham's
+Class-2 Senate seat is up in 2026 too. Scoped to `general2026` only, not the `demo`/ALL8 set.)
 
 ## 🗳️ Target Races
 US President + US Senate
@@ -56,6 +58,7 @@ Files live in data\raw\ ; codebook/READMEs in data\raw\docs\
 | NV | 2018 + 2024 | NO 2020 Senate race |
 | PA | 2018 + 2024 | NO 2020 Senate race |
 | WI | 2018 + 2024 | NO 2020 Senate race |
+| SC | 2020 only | Graham–Harrison (Class-2 seat up again 2026); loaded 2026-07-17 via `etl_sc_baseline.py`, NOT the original `etl_baseline.py` |
 
 ---
 
@@ -124,19 +127,57 @@ GA Senate also stores election_year=2021 (the Jan runoff, county-level pseudo-pr
 ---
 
 ## 🔴 Live Data — per-state ENR systems (Election Night) — see FEED_AUDIT.md
+## Updated 2026-07-17 — Clarity is DEAD for every state checked EXCEPT SC (still alive there).
 
-  GA:  Clarity, STATEWIDE   results.enr.clarityelections.com/GA/{id}/   (parser built; mode cols ✓)
-  PA:  Clarity, COUNTY-by-county   .../PA/{county}/{id}/   (per-county discovery)
-  TX:  Clarity, COUNTY-by-county   .../TX/{county}/{id}/   (per-county discovery)
-  MI:  Clarity (counties) + MI SoS   .../MI/{county}/{id}/
-  AZ:  OWN — results.arizona.vote   (statewide; confirm live mode)
-  NV:  OWN — Results.NV.gov / nvsos.gov/electionresults   (statewide)
-  NC:  OWN — er.ncsbe.gov   (dashboard WITH "by voting method" — best/easiest)
-  WI:  ⚠️ NO statewide feed — 72 county clerk sites, AP-aggregated (HARDEST)
+  ✅ NC:  WIRED — own dashboard, open S3 bulk file, er.ncsbe.gov (nc_live_feed.py). Live
+          ballot-mode split (election_day/early/mail/provisional). 100 counties.
+  ✅ GA:  WIRED — Enhanced Voting API, results.sos.ga.gov (ga_live_feed.py). Totals only
+          (mode='all'). 159 counties.
+  ✅ PA:  WIRED — own AngularJS SPA/API, electionreturns.pa.gov (pa_live_feed.py). Live
+          ballot-mode split. ONE call returns all 67 counties.
+  ✅ AZ:  WIRED — own CDN, cdn1.arizona.vote (az_live_feed.py). Totals only. ONE call
+          returns all 15 counties x all races. electionIds pre-published & stable.
+          PRIMARY-NIGHT READY for Jul 21 (no President/Senate race on AZ's own 2026
+          ballot — mechanics smoke test only, using Governor).
+  ✅ MI:  WIRED — own system, mvic.sos.state.mi.us (mi_live_feed.py, via Playwright).
+          Cloudflare blocks headless AND plain httpx — needs a HEADED browser. ONE bulk
+          ZIP (GetPrecinctResultsFile) = every precinct x every office statewide.
+          electionId auto-discovered (NOT pre-published like AZ's). PRIMARY-NIGHT READY
+          for Aug 4 — MUST run from a machine with a real display.
+  ✅ TX:  WIRED — own system, results.texas-election.com (tx_live_feed.py). Cloudflare WAF
+          blocks plain httpx, but HEADLESS Playwright passes (no display needed, unlike
+          MI). ONE call (County.json) = all 254 counties x all races, keyed by 5-digit
+          county FIPS directly — no name-matching at all.
+  ✅ SC:  WIRED — NEW 9th state (2026-07-17, not one of the original 8; baseline loaded
+          from scratch via etl_sc_baseline.py). enr-scvotes.org — the ONE state where the
+          classic Clarity mechanism (current_ver.txt) is still alive, plain httpx, no
+          Cloudflare/WAF/Playwright at all. ONE call (ALL.json) = all 46 counties x all
+          contests (⚠️ excludes a pseudo-county literally named "-1"). Validated against
+          the real June 2026 primary — exact match. Real nominees in manifest: Graham (R)
+          vs Andrews (D). Nov 2026 electionId not yet known (discover closer to the night).
+  ⚪ NV:  DEPRIORITIZED — no Senate/President race on NV's Nov 2026 ballot (Class 3 seat,
+          next up 2028). Revisit for general2028 prep.
+  ⚪ WI:  DEPRIORITIZED — same reason as NV (Class 3, 2028) — ALSO the hardest case (NO
+          statewide feed, 72 county clerk sites). AP Elections API priced project-wide AND
+          re-checked WI-specific (2026-07-17) — still quote-only, no shortcut found.
 
-⭐ Consider an AP Elections API (uniform across all 8 + likely mode splits) — FEED_AUDIT.md.
-Dataverse/MIT is the historical BASELINE, NOT a live feed. Clarify lib: pip install clarify.
-Poll interval 60s · fetch current_ver.txt first · election_id changes each cycle (mid-late Oct).
+All 7 wired states validated to the EXACT certified/real result (6 vs the 2024 general;
+SC vs its own June 2026 primary). Every `*_live_feed.py` maps to county-pseudo-precincts
+`{ST}-{fips}-CTY` so the analytics run unchanged.
+Dataverse/MIT is the historical BASELINE, NOT a live feed.
+Before committing build time to a state, check it actually has a race on the CURRENT
+election's manifest (`api/elections.py`) — NV/WI didn't, which cost nothing to check.
+
+⚠️ **`ingestor/etl_baseline.py` is DESTRUCTIVE** — it drops and rebuilds baseline.db from
+scratch using only its 5 hardcoded sources for the original 8 states. NEVER run it to add
+a state or a year; it would wipe every live-feed county-pseudo baseline built up above.
+Adding a state (like SC) needs its OWN small additive loader instead
+(`etl_sc_baseline.py` is the template) — and requires adding `EV`/`STATE_NAMES` entries in
+`api/main.py` too (the states endpoint crashes on a missing EV entry, not just cosmetic).
+
+⚠️ **Production DB is a static release snapshot** (GitHub Release `db-v1`, gzip'd) — local
+changes (SC, all the county-pseudo work) don't reach the live Vercel/Render site until
+someone re-gzips baseline.db and uploads a new release asset (see DEPLOY.md). Not done yet.
 
 ---
 
@@ -201,8 +242,8 @@ UI run:   cd ui && npm run dev   → http://localhost:5173  (needs API running)
   PRECINCT IDs  Some precincts renamed after 2020 redistricting
                 Use county FIPS as fallback join key if name mismatch
 
-  CLARITY IDs   election_id changes each election cycle
-                Fetch from SOS website fresh before every election night
+  ELECTION IDS  Changes each cycle; AZ's are pre-published & stable, others (MI, and
+                whatever TX/NV turn out to be) must be re-discovered close to the night
 
   2022 SENATE   Not yet loaded — needed for the general2028 stub (Class-3 seats).
                 DOI 10.7910/DVN/IAD3XR. NV/PA/WI had no 2020 Senate (use 2018/2024).

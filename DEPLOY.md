@@ -152,11 +152,25 @@ swap **SQLite → Postgres** (so workers share one DB).
 
 ## 4. The live poller in production (election night)
 
-Today the "Next Batch" button stands in for the poller. In production, run
-`ingestor/clarity_poller.run_poller(LiveClarityFeed(...), interval=60, on_write=...)`
-as a **background worker** — either a FastAPI startup task or a separate Render
-**Background Worker** / Fly process sharing the same DB/disk. It writes `results_live`;
-the WebSocket then pushes updates to all viewers. (Gated on Issues #1/#3/#8 — see PREP.md.)
+**UPDATED 2026-07-17** — the original plan below (`LiveClarityFeed` + `clarity_poller`)
+assumed Clarity everywhere; that's now confirmed dead for every state we've checked. The
+ACTUAL live path is the per-state `ingestor/*_live_feed.py` scripts (`nc_live_feed.py`,
+`ga_live_feed.py`, `pa_live_feed.py`, `az_live_feed.py`, `mi_live_feed.py` — 5 states wired
+so far, see CONTEXT.md/PROGRESS.md). Each writes the same `results_live` schema
+(`{ST}-{fips}-CTY` county-pseudo-precincts), so they're drop-in interchangeable with the
+old poller design from the analytics/API's point of view — only the fetch mechanism per
+state differs. Today the "Next Batch" button still stands in for the poller in the demo UI.
+
+For production: wrap the per-state scripts in a scheduler (a simple loop calling each
+state's `ingest(...)` on an interval, e.g. every 60s) as a **background worker** — either a
+FastAPI startup task or a separate Render **Background Worker** / Fly process sharing the
+same DB/disk. It writes `results_live`; the WebSocket then pushes updates to all viewers.
+**MI is the one exception**: it needs a HEADED Playwright browser (Cloudflare blocks
+headless), so its poller process needs a real display — it likely can't run inside a
+typical headless Render/Fly worker and may need to run from a separate machine that pushes
+into the same DB, or a display-capable container.
+(Original gating in Issues #1/#3/#8 is now mostly resolved — see PREP.md's 2026-07-17
+update for current status; WI remains the one open item.)
 
 ---
 

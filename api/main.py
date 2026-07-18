@@ -41,10 +41,10 @@ import simulation
 from db import get_conn
 
 # Electoral votes (2024+ apportionment) + display names, for the EV tracker.
-EV = {"GA": 16, "PA": 19, "AZ": 11, "NV": 6, "WI": 10, "MI": 15, "NC": 16, "TX": 40}
+EV = {"GA": 16, "PA": 19, "AZ": 11, "NV": 6, "WI": 10, "MI": 15, "NC": 16, "TX": 40, "SC": 9}
 STATE_NAMES = {"GA": "Georgia", "PA": "Pennsylvania", "AZ": "Arizona",
                "NV": "Nevada", "WI": "Wisconsin", "MI": "Michigan",
-               "NC": "North Carolina", "TX": "Texas"}
+               "NC": "North Carolina", "TX": "Texas", "SC": "South Carolina"}
 STATES = list(EV.keys())
 # Per-election ballot manifest lives in elections.py (which races, which states,
 # which baseline year per state). The dashboard reads from it, so a real election

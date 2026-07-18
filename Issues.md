@@ -308,7 +308,46 @@ Re-run `ingestor/etl_ga_runoff_2021.py` after adding the 4 (it's idempotent).
 ---
 
 ## ISSUE #8 — Election-night live FEED audit (mode availability + non-Clarity states)
-**Logged:** 2026-06-28 · **Status:** 🔴 OPEN (prep task — everything hinges on it)
+**Logged:** 2026-06-28 · **Status:** 🟡 MOSTLY RESOLVED — 5/8 states wired (2026-07-17)
+
+### 🔬 UPDATE 2026-07-17 — 7 states WIRED END-TO-END (incl. a NEW 9th state, SC); NV+WI
+### DEPRIORITIZED (no 2026 race)
+NC, GA, PA, AZ, MI, TX, and SC are all now built + validated (not just within tolerance) —
+`nc_live_feed.py`, `ga_live_feed.py`, `pa_live_feed.py`, `az_live_feed.py`,
+`mi_live_feed.py`, `tx_live_feed.py`, `sc_live_feed.py` (full detail in PROGRESS.md,
+per-state audit in FEED_AUDIT.md). Key corrections to the original framing below:
+- **"Clarity is broader than GA only" turned out to be WRONG — mostly.** GA/PA/AZ/MI/TX
+  all run their OWN bespoke systems now — Clarity's old endpoints are confirmed
+  dead/decommissioned there. **SC is the one genuine exception**: its Clarity/SOE Software
+  instance (enr-scvotes.org) is STILL fully alive, using the exact classic discovery
+  mechanism (`current_ver.txt`) this issue originally described — a useful reminder that
+  "Clarity is dead" is an empirical per-state finding, not a universal law.
+- The actual per-state task was: use real-browser network inspection (Playwright, or a
+  controlled Chrome/in-app browser tool) to find the state's CURRENT data endpoint — a
+  discovery problem, not a bot-block problem, EXCEPT for MI (Cloudflare blocks headless —
+  needs a HEADED Chromium with `navigator.webdriver` masked) and TX (Cloudflare WAF blocks
+  plain httpx, but headless Playwright is enough — no display needed). SC needed NO
+  browser at all, ever — plain httpx throughout, the simplest state wired this project.
+- AZ and MI are additionally **primary-night-ready** (Jul 21 / Aug 4) — see CONTEXT.md's
+  runbook. SC needed no primary-night test — validated directly against its own real June
+  2026 primary results (exact statewide + per-candidate match).
+- **SC was never one of the original 8 target states** — had zero data loaded. Added a
+  standalone additive baseline loader (`etl_sc_baseline.py`) rather than reusing the
+  original `etl_baseline.py`, which was discovered mid-session to `os.remove()` and fully
+  rebuild baseline.db from just its 5 hardcoded sources — running it to add a state would
+  have destroyed every other state's live-feed work. Also required adding `SC` to
+  `api/main.py`'s `EV`/`STATE_NAMES` dicts (not cosmetic — `/api/states` sums EV
+  unconditionally and crashes on a missing entry).
+- **NV and WI DEPRIORITIZED (2026-07-17), not "next up" as originally planned.** Checked
+  directly against `api/elections.py`: `general2026` senate states = `["GA","MI","NC","TX",
+  "SC"]` — neither NV nor WI has a Senate OR President race on the Nov 3, 2026 ballot (both
+  are Class 3, next up 2028). So neither gates this November's election night — revisit
+  ahead of `general2028` instead. **Wisconsin remains the one genuinely hard case regardless
+  of timing** — no statewide feed at all (72 county clerk sites), a fundamentally different
+  problem than "find the one bespoke system." AP Elections API was priced project-wide AND
+  re-checked WI-specific (2026-07-17, at user request) — still quote-only, no shortcut
+  found either time (also checked whether a public news aggregator leaks a free JSON feed
+  under an existing AP contract — no, fully static pages, nothing to piggyback on).
 
 Surfaced while building the ballot-mode feature. Two realities for going live:
 - **Dataverse/MIT is NOT a live feed** — it's the historical BASELINE only. Live data

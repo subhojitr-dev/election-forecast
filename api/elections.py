@@ -61,15 +61,18 @@ ELECTIONS = {
         "label": "General · Nov 3, 2026 (midterm)",
         "date": "2026-11-03",
         # No presidential race in 2026. Senate = Class-2 seats only.
-        "races": {"senate": ["GA", "MI", "NC", "TX"]},
+        "races": {"senate": ["GA", "MI", "NC", "TX", "SC"]},
         # Each seat's baseline = the last time IT was contested (2020; GA = 2021 runoff).
-        "senate_baseline": {"GA": 2021, "MI": 2020, "NC": 2020, "TX": 2020},
+        "senate_baseline": {"GA": 2021, "MI": 2020, "NC": 2020, "TX": 2020, "SC": 2020},
         # Real 2026 nominees (primaries decided Mar–Jun 2026; MI primary is Aug 4).
         "candidates": {"senate": {
             "GA": {"dem": "JON OSSOFF", "rep": "MIKE COLLINS"},
             "NC": {"dem": "ROY COOPER", "rep": "MICHAEL WHATLEY"},
             "TX": {"dem": "JAMES TALARICO", "rep": "KEN PAXTON"},
             "MI": {"dem": "DEM NOMINEE — TBD AUG 4", "rep": "GOP NOMINEE — TBD AUG 4"},
+            # SC primary was 2026-06-12 (enr-scvotes.org, electionId 126294):
+            # Graham (R, incumbent) 56.78%/264,091 beat Mark Lynch; Andrews (D) 61.53%/226,075.
+            "SC": {"dem": "ANNIE ANDREWS", "rep": "LINDSEY GRAHAM"},
         }},
     },
     "general2028": {

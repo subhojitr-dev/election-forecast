@@ -8,8 +8,11 @@ requests      # Phase 2 — HTTP client for live feed fetching
 fastapi       # Phase 4 — REST API + WebSocket
 uvicorn       # Phase 4 — ASGI server
 
-httpx         # Live-readiness — state live feeds (nc_*, ga_live_feed): plain HTTP + JSON/zip
+httpx         # Live-readiness — state live feeds (nc_*, ga_, pa_, az_live_feed): plain HTTP + JSON/zip
+playwright    # mi_live_feed.py — MI's Cloudflare blocks headless + plain httpx; needs a
+              # HEADED browser (see ingestor/mi_live_feed.py docstring). Local/election-night
+              # only — NOT needed on the Render server (MI ingest runs from a machine with a
+              # display, not the API host). Run `playwright install chromium` after pip install.
 
 # Planned for later phases (not yet used):
 # apscheduler  # optional — alt scheduler for 60s polling (we use a simple loop)
-# playwright   # discovery/Cloudflare-bypass ONLY (local; heavy — NOT on the Render server)

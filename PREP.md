@@ -1,7 +1,8 @@
 # PREP.md — Election-Night Live Data Readiness Plan
 
 **Goal:** be able to pull, parse, map, and display **all** live results for the 8
-target states on **Election Day — Tuesday, November 3, 2026.**
+target states — **plus SC, added 2026-07-17** as a 9th (its Senate seat is up in 2026
+too) — on **Election Day — Tuesday, November 3, 2026.**
 **Today:** 2026-06-28 (~18 weeks out). Owner: project.
 **Read with:** `Issues.md` (#1 fetch, #3 crosswalk, #8 feed audit) and `HANDOVER_BRIEF.md`.
 
@@ -25,21 +26,29 @@ target states on **Election Day — Tuesday, November 3, 2026.**
 
 ---
 
-## 1. Per-state live feed status (CONFIRM in the audit — best current understanding)
+## 1. Per-state live feed status — UPDATED 2026-07-17 (was all wrong — Clarity assumption
+## busted; every state we've checked runs its OWN system. See FEED_AUDIT.md for full detail.)
 
-| State | Live ENR system | Scope | Ballot-mode in feed? | Ingestor needed | Test window |
-|-------|-----------------|-------|----------------------|-----------------|-------------|
-| **GA** | **Clarity** | statewide | Yes (runoff file proves it) | ✅ have parser | live GA special (primary past) |
-| **PA** | **Clarity** | county-by-county (Allegheny…) | likely | per-county discovery | primary past |
-| **TX** | **Clarity** | county-by-county (Tarrant, Denton…) | varies | per-county discovery | primary past |
-| **MI** | **Clarity** (counties) + state aggregator | county + state | absentee (AV) reported | per-county discovery | **MI primary Aug 4** |
-| **AZ** | **Own** (AZ SOS / county sites; Maricopa own) | state + county | usually (early vs day-of) | **build** | **AZ primary Jul 21** |
-| **NV** | **Own** (NV SOS) | statewide | usually (mail/early) | **build** | primary past (Jun 9) |
-| **WI** | **Own** (county clerks / WEC) | county | limited live | **build** | **WI primary Aug 11** |
-| **NC** | **Own** (NCSBE ENR) | statewide | yes (by method) | **build** | primary past |
+| State | Live ENR system | Scope | Ballot-mode in feed? | Ingestor | Status |
+|-------|-----------------|-------|----------------------|----------|--------|
+| **NC** | **Own** — NCSBE dashboard | statewide, open S3 bulk file | ✅ yes (by method) | `nc_live_feed.py` | ✅ **WIRED**, exact match to certified |
+| **GA** | **Own** — Enhanced Voting (was Clarity) | statewide + per-county | totals only | `ga_live_feed.py` | ✅ **WIRED**, exact match to certified |
+| **PA** | **Own** — electionreturns.pa.gov (AngularJS/API) | statewide, 1 call = all 67 counties | ✅ yes (election-day/mail/provisional) | `pa_live_feed.py` | ✅ **WIRED**, exact match to certified |
+| **AZ** | **Own** — cdn1.arizona.vote (open CDN) | statewide, 1 call = all 15 counties x all races | totals only | `az_live_feed.py` | ✅ **WIRED**, primary-night-ready **Jul 21** |
+| **MI** | **Own** — mvic.sos.state.mi.us (Cloudflare; needs HEADED browser) | statewide bulk ZIP, every precinct x every office | totals only | `mi_live_feed.py` (Playwright) | ✅ **WIRED**, primary-night-ready **Aug 4** |
+| **TX** | **Own** — results.texas-election.com (Cloudflare WAF; headless Playwright is enough) | statewide, 1 call = all 254 counties x all races, keyed by FIPS directly | totals only | `tx_live_feed.py` (headless Playwright) | ✅ **WIRED**, exact match to certified |
+| **SC** | **Own** — enr-scvotes.org (classic Clarity, STILL ALIVE — the one exception; plain httpx, no Cloudflare) | statewide, 1 call = all 46 counties x all contests | totals only | `sc_live_feed.py` | ✅ **WIRED**, NEW 9th state (baseline built from scratch), exact match to the real June 2026 primary |
+| **NV** | unknown — not mapped | — | — | not started | ⚪ **DEPRIORITIZED** — no 2026 race (Class 3, next up 2028) |
+| **WI** | ⚠️ **NONE statewide** | 72 county clerk sites | ❌ minimal live | AP priced + re-checked WI-specific — **still SKIPPED** (quote-only, no shortcut) | ⚪ **DEPRIORITIZED** — no 2026 race either (same reason as NV); also the hardest case regardless |
 
-**Takeaway:** ~half are reachable via Clarity (GA statewide; PA/TX/MI per-county), the
-other ~half (**AZ, NV, WI, NC**) need their own ingestors. This is the biggest build item.
+**Takeaway:** the original "half are Clarity" model was wrong — Clarity's old endpoints are
+confirmed dead across GA/PA/AZ/MI/TX. **SC is the one exception** — added as a NEW 9th
+state (never one of the original 8) specifically because its Clarity ENR is still fully
+alive, and its Senate seat is up in 2026 too. Every state mapped so far runs its own
+system (or, for SC, the still-live classic one), discoverable via real-browser network
+inspection (Playwright or a controlled Chrome). 6/8 original + SC wired; NV+WI
+deprioritized (no 2026 race — see timeline below); WI remains the one true hard case
+whenever it's picked back up.
 
 ---
 
@@ -57,81 +66,122 @@ other ~half (**AZ, NV, WI, NC**) need their own ingestors. This is the biggest b
 
 ---
 
-## 3. Timeline (now → Nov 3, 2026)
+## 3. Timeline (now → Nov 3, 2026) — UPDATED 2026-07-17
 
-**Now → mid-July (foundation + first live test)**
-- [ ] Solve the Clarity 403 against a *currently-live* Clarity election (Issue #1).
-- [ ] **Per-state feed audit (Issue #8):** for each of the 8, pull a sample/live detail
-      file and record: system (Clarity/own), scope (state/county), does it carry
-      vote-type subtotals, live vs final-only, URL pattern, ID scheme.
-- [ ] Stand up the non-Clarity fetcher skeletons (AZ, NV, WI, NC).
+**⚠️ SUPERSEDED ASSUMPTION:** everything below originally assumed a precinct-name
+CROSSWALK (Issue #3) was required. **DECISION 2026-06-30: county-level v1 makes the
+crosswalk MOOT** — we join live-to-baseline on county FIPS (`{ST}-{fips}-CTY`), which is
+stable year-to-year and needs no name-matching. So "crosswalk" items below are done-by-
+design, not a build task. See CONTEXT.md's "county-pseudo-precinct pattern" for the
+mechanism actually used by every wired state (NC/GA/PA/AZ/MI/TX).
 
-**Jul 21 — Arizona primary (LIVE TEST · non-Clarity)**
-- [ ] Pull AZ live ENR end-to-end; validate fetch + parse + a first AZ precinct crosswalk.
-- [ ] Confirm whether AZ exposes early/election-day splits live.
+**Now → mid-July (foundation + first live test)** — ✅ DONE, but not as originally planned:
+- [x] ~~Solve the Clarity 403~~ — REFRAMED: Clarity is dead/decommissioned everywhere we
+      checked; the real task was per-state discovery of each state's CURRENT system
+      (Enhanced Voting, or a bespoke state-run site), not beating a block.
+- [x] **Per-state feed audit (Issue #8):** done for GA/NC/PA/AZ/MI/TX — see FEED_AUDIT.md.
+- [x] Fetchers built + validated for NC, GA, PA, AZ, MI, TX (all 6 match certified exactly).
 
-**Aug 4 — Michigan primary (LIVE TEST · county-level Clarity)**
-- [ ] Exercise the per-county Clarity discovery + fetch for MI counties.
-- [ ] Build/validate the MI precinct crosswalk; check absentee (AV) reporting.
+**Jul 21 — Arizona primary (LIVE TEST)**
+- [x] AZ live ingest built + validated against the 2024 general (exact match, 15/15
+      counties); electionId (68) confirmed live now, mechanics smoke-tested at 0%.
+- [ ] **On the night:** run the runbook in CONTEXT.md; confirm real vote/precinct numbers
+      move as counties report (AZ's 2026 primary has no President/Senate race, so this is
+      a mechanics validation using Governor, not a manifest data load).
 
-**Aug 11 — Wisconsin primary (LIVE TEST · non-Clarity)**
-- [ ] Pull WI live ENR; validate parser + crosswalk; gauge how much is live vs canvass.
+**Aug 4 — Michigan primary (LIVE TEST)**
+- [x] MI live ingest built + validated against the 2024 general (exact match, 83/83
+      counties) — via a headed Playwright browser + a bulk-ZIP endpoint (not per-county
+      Clarity — that assumption was wrong; MI runs its own system).
+- [ ] **On the night:** the election isn't in MI's dropdown yet (checked 2026-07-17) —
+      poll `mi_live_feed.py "8/4/2026" senate` in the days before to catch it appearing,
+      then run the runbook in CONTEXT.md. Needs a machine with a real display.
+
+**Aug 11 — Wisconsin primary** — ⚪ **DEPRIORITIZED 2026-07-17.** WI has no Senate or
+President race on the Nov 3, 2026 ballot (Class 3 seat, next up 2028) — confirmed against
+`api/elections.py`. Not gating this November; Aug 11 is a free test window IF picked back
+up, not a deadline. If/when resumed: no statewide feed exists — likely a per-county build
+(top ~8-10 counties by population) or a deliberate coarser compromise; AP Elections API
+re-priced WI-specific per user request, still quote-only, no shortcut found.
 
 **Aug → Sep (harden against real feeds)**
-- [ ] Finalize precinct crosswalks for tested states; county fallback everywhere.
-- [ ] Build per-state "bucket name" normalization (advance/early/absentee/mail/UOCAVA).
-- [ ] For GA statewide-Clarity: test against any live GA special/municipal election.
+- [x] Wire TX — done 2026-07-17 (own system, headless Playwright, cleanest join of any
+      state — one call, 254 counties, keyed by FIPS directly).
+- [x] ~~NV~~ — DEPRIORITIZED 2026-07-17, same reason as WI (no 2026 race, Class 3/2028).
+- [ ] Wire WI (or land on a deliberate compromise) — only if picked back up; not urgent.
+- [ ] Add SC if it turns out to be easy (Class-2 Graham seat, `enr-scvotes.org`).
+- [x] ~~Precinct crosswalks~~ — moot, see note above.
+- [x] ~~Bucket-name normalization~~ — done per-state as each feed was wired (PARTY maps
+      in each `*_live_feed.py`; MODE_COLS-style maps for NC/PA's ballot-mode splits).
 
 **Early–mid October**
-- [ ] Election-ID auto-discovery for all 8 states.
-- [ ] Non-Clarity ingestors complete + parsers validated for NV, NC (no summer primary
-      to test → use their most recent live election / archives).
+- [ ] Election-ID auto-discovery for any state that still needs it on election night
+      (AZ's is pre-published/stable; MI/TX auto-discover already; check WI/NV whenever
+      they're picked back up).
 
 **~2 weeks before (mid–late October)**
-- [ ] States publish the Nov general to their ENR (0% reported). Capture the **real
-      2026 election IDs** for all 8.
-- [ ] Full dry run end-to-end against the live (empty) feeds: fetch → parse → crosswalk
-      → analytics → dashboard, all 8 states × President + Senate.
+- [ ] States publish the Nov general to their live systems (0% reported). Capture the
+      **real 2026 election IDs** for whichever states need fresh discovery.
+- [ ] Full dry run end-to-end: fetch → parse → county-pseudo mapping → analytics →
+      dashboard, all wired states × President + Senate.
 
 **Election week (late Oct → Nov 2)**
-- [ ] Final rehearsal; set polling intervals (~60s); redundancy + monitoring + safe
-      restart (full snapshots self-heal).
+- [ ] Final rehearsal; set polling intervals; redundancy + monitoring + safe restart
+      (full snapshots self-heal).
 
 **Nov 3 — Election Night**
-- [ ] Go live: Phase 2 poller replaces the "Next Batch" stepper (same data path).
+- [ ] Go live: the `*_live_feed.py` scripts (or a scheduler wrapping them) replace the
+      "Next Batch" stepper (same data path — zero analytics/UI changes).
 
 ---
 
 ## 4. Primary test calendar (what each buys us)
 
-| Date | State | Tests | Feed type |
-|------|-------|-------|-----------|
-| **Jul 21** | Arizona | non-Clarity fetch + parse + crosswalk | own system |
-| **Aug 4** | Michigan | per-county Clarity discovery + crosswalk | county Clarity |
-| **Aug 11** | Wisconsin | non-Clarity fetch + live-vs-canvass behavior | own system |
+| Date | State | Tests | Status |
+|------|-------|-------|--------|
+| **Jul 21** | Arizona | mechanics: uploadId/precinct-count/vote changes live | ✅ code-ready, awaiting the night |
+| **Aug 4** | Michigan | headed-Playwright + bulk-ZIP mechanism live; election-id discovery | ✅ code-ready, awaiting the night |
+| **Aug 11** | Wisconsin | whatever approach we land on, IF picked back up (no longer urgent) | ⚪ deprioritized (no 2026 race) |
 
-GA/PA/TX/NV/NC primaries are already past (test those against live specials or archives).
-
----
-
-## 5. Risk register
-
-| Risk | Issue | Mitigation |
-|------|-------|------------|
-| Clarity 403 blocks fetch | #1 | browser-faithful session; headless-browser fallback; test on live primary |
-| Live precinct → baseline mapping | #3 | crosswalk from 2026 primaries; county fallback for unmatched |
-| Non-Clarity states need bespoke ingestors | #8 | build + test AZ/NV/WI/NC against summer primaries |
-| Ballot-mode not published live (esp. military/UOCAVA) | #8 | mode is OPTIONAL — defaults to 'all', geography-only fallback |
-| Election IDs only known ~2 wks out | — | auto-discovery + mid-Oct dry run |
+GA/PA/NC/TX primaries are already past — those 4 were validated against the 2024 general
+archive instead (the only option once a primary has passed). NV/WI deprioritized (no 2026
+race for either — see Issue #8 update in Issues.md).
 
 ---
 
-## 6. Confidence (today)
+## 5. Risk register — UPDATED 2026-07-17
 
-- **Data exists in Clarity feeds:** high (~80%) — proven by the GA mode columns.
-- **Reliably pull all 8 states live, this November:** moderate (~50–60% today), rising
-  as we beat the 403 and build the non-Clarity ingestors and crosswalks.
-- **Military/UOCAVA as a live bucket:** low — usually only in the final canvass.
+| Risk | Status | Mitigation |
+|------|--------|------------|
+| ~~Clarity 403 blocks fetch~~ | 🟢 moot | Clarity confirmed dead everywhere checked — not the actual obstacle |
+| ~~Live precinct → baseline mapping~~ | 🟢 moot | county-level v1 (FIPS join) eliminated this — see Issues.md #3 |
+| MI's Cloudflare block | 🟢 resolved | headed Playwright + webdriver mask passes; headless does not |
+| TX's Cloudflare WAF block | 🟢 resolved | headless Playwright passes (confirmed identical to headed — no display needed) |
+| Election IDs not always pre-known | 🟡 ongoing | AZ: pre-published. MI/TX: auto-discovered, not live yet for Aug 4/whenever needed. NV/WI: deprioritized, unknown until picked back up |
+| Wisconsin has no statewide feed | 🟡 open but not urgent | doesn't gate Nov 2026 (no race) — see the WI scoping note (Issues.md / CONTEXT.md); revisit ahead of 2028 |
+| NV/WI have no 2026 race | 🟢 resolved (by deprioritizing) | confirmed against `api/elections.py`; not a build risk, just deferred to 2028 prep |
+| Ballot-mode not published live everywhere | 🟢 handled | mode is OPTIONAL — defaults to 'all'; NC + PA have it, GA + AZ + MI + TX don't (fine) |
 
-The single biggest de-risker is **testing against the real July/August primaries** —
-that converts election-night unknowns into a calm, fixable checklist now.
+---
+
+## 6. Confidence (today) — UPDATED 2026-07-17
+
+- **7 states wired + validated** (not just within tolerance): NC, GA, PA, AZ, MI, TX — the
+  6 of 8 original targets — PLUS **SC, a NEW 9th state** added because its Senate seat is
+  up in 2026 too. AZ and MI are additionally primary-night-ready for Jul 21 / Aug 4.
+- **Reliably pull every state that actually gates Nov 3, 2026:** HIGH — NC, GA, MI, TX, SC
+  (the full `general2026` senate list) are all wired and validated. PA and AZ are also
+  wired (ahead of their own 2028 races, serving as mechanism-proving + 2028 prep).
+- **NV and WI:** deprioritized, not a risk to Nov 2026 — neither has a race on this
+  November's ballot (confirmed against `api/elections.py`). Revisit ahead of `general2028`.
+  Wisconsin remains the one place the "find the bespoke system" pattern may genuinely not
+  apply (no state-run aggregator exists) — worth extra lead time whenever it's picked up.
+- **Military/UOCAVA as a live bucket:** low — usually only in the final canvass. Not
+  blocking (mode defaults to 'all').
+
+The single biggest de-risker was **testing the discovery methodology against real
+government sites** (not just desk research) — every state so far had an actual open data
+source once someone looked at real network traffic instead of assuming Clarity. The second
+biggest de-risker was **checking each state's actual ballot before spending build time on
+it** — NV and WI turned out to have nothing to track for 2026, caught only by checking
+`api/elections.py` directly rather than assuming all 8 states matter equally.

@@ -5,6 +5,264 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-07-17 (cont.) — TESTING.md §8 added (live-feed test guide); correction: GA's BOTH
+## Jan-2021 Senate runoffs ARE fetchable live after all
+
+Added a new TESTING.md section (§8) covering how to run and validate the real
+`*_live_feed.py` scripts (distinct from the existing §1–7 simulator tests) — a GA
+walkthrough as the template, a per-state quick-reference table, state-specific gotchas,
+the AZ/MI primary-night mechanics tests, and what changes for Nov 3. Also created
+`OVERVIEW.md` — a new single-document summary of what's built + what's still planned,
+linked from README.md's doc table.
+
+While writing §8, testing every documented command against the live API caught two real
+bugs before publishing: (1) GA's originally-drafted Senate test command used a contest
+name ("US Senate") that doesn't exist on the 2024 ballot at all — GA had NO Senate race
+in the Nov 2024 general (Ossoff's seat is 2026, Warnock's was 2022); (2) both AZ's and
+SC's primary-mechanics test commands reused the SAME scratch `race_type` for two
+different candidates/parties, but each script's internal `DELETE` is scoped to that
+name — the second call would have silently wiped the first call's rows. Fixed all three.
+
+**First attempt at fixing (1) undersold GA**, framing Senate as "mechanism-test only"
+(no real baseline match available) using the 2022 Warnock-vs-Walker general as a
+stand-in. **User caught this as wrong** — GA actually had TWO Senate runoffs in Jan 2021
+(the regular Ossoff-vs-Perdue seat AND the special Warnock-vs-Loeffler seat, same day),
+and asked whether both could be included. Re-searched GA's Enhanced Voting system
+properly this time (via `results.sos.ga.gov`'s own election-history page, not just
+guessing URLs) and found both runoffs ARE archived together under one election ID,
+`2021JanFedRun` — a single call returns both contests (`"US Senate (Perdue)"` and
+`"US Senate (Loeffler) - Special"`). Fetched both: Ossoff 2,269,923 D / Perdue 2,214,979
+R, and Warnock 2,289,113 D / Loeffler 2,195,841 R — **exact match** to the certified
+baselines already loaded (via `etl_ga_runoff_2021.py`, back on 2026-06-28/2026-07-06).
+Rewrote TESTING.md's GA walkthrough to test **all three GA races** (president, senate,
+senate_special) as full apples-to-apples baseline matches, verified live against the
+running API for each (`pres2024`/`general2026`/`demo` respectively — each race lives
+under a different election in the manifest, which is itself a real gotcha worth
+documenting: `general2026` has no President race, and `senate_special` only exists in
+`demo` since Warnock already won his full term).
+**Lesson:** "not independently fetchable" was a premature conclusion from insufficient
+discovery, not a real limitation of GA's system — worth remembering before writing off a
+similar case elsewhere as mechanism-only.
+
+---
+
+## 2026-07-17 (cont.) — SC added as a NEW 9th state, WIRED END-TO-END ✅ (7th live state)
+
+User confirmed TX/NV primaries already passed (Nov-2026 prep) and asked to look at SC next,
+since SC's primary is also already over. Unlike every state so far, **SC was never one of
+the original 8 target states** — baseline.db had ZERO SC data (no precincts, nothing).
+SC's Senate seat (Lindsey Graham, Class 2) IS up in 2026 though — same class as GA/MI/NC/TX
+— so this was a legitimate, not-deprioritized addition (unlike NV/WI).
+
+**Baseline load:** wrote `ingestor/etl_sc_baseline.py`, a standalone ADDITIVE loader —
+deliberately NOT reusing the original `ingestor/etl_baseline.py`, which was discovered to
+`os.remove()` and fully rebuild baseline.db from just its 5 hardcoded sources on every run
+(would have destroyed all 6 states' live-feed work done earlier this session). Confirmed
+the raw Harvard Dataverse CSVs already on disk (nationwide files, previously filtered to
+the 8 target states) DO contain SC rows: President 2020 (34,605 rows), President 2024
+(49,434 rows), Senate 2020 (27,684 rows — Graham vs Harrison; SC had no 2018/2024 Senate
+race). Hit one bug on first run: inserting precincts per-dataset instead of a single
+deduped union across all 3 datasets violated the `precincts.id` PRIMARY KEY (same precinct
+appears in both president years) — restored from a pre-SC backup and fixed by unioning +
+deduping precincts once before any insert (matching the original script's actual pattern).
+Loaded cleanly on retry: 3,864 precincts, 46 counties, SC 2020 Senate sanity-checked at
+DEM 1,110,828 / REP 1,369,137 (Graham won, matches real-world ~55/45 split).
+`etl_sc_county_baseline.py` (NC-pattern) converts senate 2020 to 46 county-pseudo precincts.
+
+**Live feed discovery:** enr-scvotes.org (bare domain) is a parked GoDaddy page — the real
+site is `www.enr-scvotes.org/SC/`, SC's Clarity/SOE Software ENR instance. Unlike every
+other state checked this session, **SC's classic Clarity mechanism is still fully alive**:
+`/SC/{electionId}/current_ver.txt` returns a plain-text version number (exactly the
+original pre-2026 Clarity discovery pattern described in Issues.md #1 — that mechanism
+isn't dead everywhere, just decommissioned for GA/others). `/SC/elections.json` returns
+`[]` right now (no election currently promoted on the homepage) — found real, still-live
+election IDs via a web search that surfaced Google-indexed URLs
+(`enr-scvotes.org/SC/126294/web.345435/`), landing on SC's actual June 12, 2026 primary
+results. From there: `/SC/{eid}/{version}/json/en/summary.json` gives contest names/codes
++ candidate names + parties (note: contest names have literal DOUBLE SPACES, e.g.
+`"U.S.  Senate  - REP"` — a Clarity quirk); `/SC/{eid}/{version}/json/ALL.json` gives
+EVERY county x EVERY contest in one call, keyed by county NAME. Found and fixed one
+parsing trap: ALL.json includes a county entry named literally `"-1"` — a statewide
+pseudo-county rollup row that, if not excluded, silently DOUBLES every statewide total
+(caught by summing and finding results were exactly 2x the real certified numbers).
+Plain httpx throughout — no Cloudflare, no WAF, no Playwright — **the simplest state wired
+this entire project** (all 7 wired states have now needed strictly less or equal fetch
+complexity than the first one, GA).
+`sc_live_feed.py` validated against the real June 2026 primary: exact match to both the
+Senate REP contest (Graham 264,091 / Lynch 134,360 / ... = 465,076 total) and Senate DEM
+contest (Andrews 226,075 / Brown 110,962 / Freeman 30,374 = 367,411 total), 46/46 counties,
+both at the statewide AND per-candidate level. Ran the full analytics pipeline against a
+synthetic Graham-vs-Andrews combination (merging the two primary contests into one
+`race_type='senate'` payload, since the real 2026 general hasn't happened) purely as a
+mechanics check — 100% reporting, 46 counties, shift/win-prob computed correctly, then
+cleaned up (not real data, shouldn't linger in results_live).
+
+**Manifest wiring:** got the REAL 2026 SC Senate nominees directly from the June primary
+results (no guessing) — Lindsey Graham (R, incumbent, won convincingly) and Annie Andrews
+(D). Added SC to `general2026`'s senate list + `senate_baseline` (2020) + `candidates` in
+`api/elections.py`. Added SC to `api/main.py`'s `EV` (9 electoral votes, confirmed via
+search) and `STATE_NAMES` dicts — **required**, not optional: `_states_payload()` sums
+`r["ev"]` unconditionally across all states in a race with no race-type gate, so a missing
+EV entry would throw `TypeError` the moment `/api/states?race=senate&election=general2026`
+was hit. Verified live: started the actual API, hit `/api/states?race=senate&election=
+general2026` — SC appears correctly at 0% reporting (real pre-election state, 46 total
+precincts), no crash, `ev_leaning` arithmetic correct. Deliberately did NOT add SC to
+`ALL8`/the `demo` election — kept the change scoped to `general2026` only, avoiding any
+ripple into UI code that might assume 8 states.
+
+⚠️ **Production DB is a static release snapshot (GitHub Release `db-v1`, gzip'd) — SC is
+LOCAL ONLY until someone re-gzips and re-uploads baseline.db.gz.** Nothing in this session
+touched the release.
+SEVEN states now fully live: NC, GA, PA, AZ, MI, TX, SC — SC being the first true 9th-state
+addition (baseline built from scratch, not just a live feed on top of existing data).
+
+---
+
+## 2026-07-17 (cont.) — WI deprioritized; TX WIRED END-TO-END ✅ (6th live state); NV skipped
+
+**WI scoping (before touching any code):** user asked what Wisconsin would actually entail
+before starting. Answer: unlike every state wired so far (one state-run system to find),
+WI has NO statewide live results feed at all — unofficial results come from 72 separate
+county clerk websites, each potentially its own vendor/format. Real work would be (1) survey
+several counties to see what's actually reachable (discovery isn't a one-time thing here,
+it's up to 72 one-time things), (2) accept partial coverage — probably 8-10 of the highest-
+population counties, since full 72-county coverage isn't realistic solo — which introduces
+a NEW architecture wrinkle (every state wired so far is 100%-of-counties; WI would be the
+first with a "N of 72 counties, X% of vote covered" caveat needed somewhere in the API/UI),
+(3) AP Elections API was already priced+rejected project-wide (2026-06-30) but might be
+worth a WI-specific re-check since fragmentation is exactly what an aggregator solves.
+User chose the AP re-check first. Result: AP pricing is still opaque everywhere (developer.ap.org,
+docs, third-party listings) — quote-only, no public tier, no WI-specific option found. Also
+checked whether a public news aggregator (NPR's live-results page) leaks a free/open
+JSON delivery endpoint under an existing AP contract — no, NPR's page is fully static/
+server-rendered with zero client-side data calls, nothing to piggyback on.
+**Bigger finding surfaced during this check:** NPR's WI page only lists Governor + U.S.
+House for the 2026 primary — no Senate. Cross-checked `api/elections.py`: `general2026`
+senate states = `["GA","MI","NC","TX"]` — **WI has no Senate or President race on the Nov
+3, 2026 ballot at all** (Senate is Class 3, next up 2028, same class as PA/AZ/NV). So WI
+doesn't gate this November's election night — Aug 11 is a convenient test window for 2028
+prep, not a real deadline. User agreed to deprioritize WI (revisit later, more runway).
+User also asked: does NV have a 2026 Senate race? Checked the same manifest — no (NV is
+also Class 3, 2028). **NV skipped for the same reason** — nothing to track for Nov 2026.
+
+**TX**: own system at results.texas-election.com (an Angular SPA — NOT Clarity/Enhanced
+Voting). A Cloudflare WAF rule blocks plain httpx outright (`"Attention Required!"` page,
+not a JS challenge) — confirmed via direct httpx test. Unlike MI, **headless Playwright is
+enough** to pass it (tested both headless and headed side by side — identical 1.8MB
+response either way), so TX's poller can run on a normal headless box/CI, no display
+needed. `tx_live_feed.py` + `etl_tx_county_baseline.py` added.
+Found the best mechanism of any state so far: ONE `County.json` call returns EVERY county
+x EVERY race in the whole state, keyed directly by **5-digit county FIPS** ("48001") — an
+exact match to our `county_fips` column, meaning zero name-matching/aliasing needed at
+all (every other state so far needed at least an uppercase county-NAME match, some with
+abbreviation quirks like MI's "GD. TRAVERSE"). Two-step version discovery mirrors AZ's
+uploadId pattern (`Version.json` → current version number → `County.json` at that
+version). electionId is auto-discovered via `ElectionConstants_404.json`'s year+type
+lookup (not hardcoded) — same idea as MI's dropdown-scan, just a cleaner data structure.
+Validated vs the 2024 general (President + Senate, both on one ballot, electionId 49664):
+254/254 counties, President Trump 6,393,597 R / Harris 4,835,250 D, Senate Cruz 5,990,741
+R / Allred 5,031,249 D — exact match to certified for both races. Ran the analytics engine
+directly against populated results_live: 100% reporting, shift≈0, win_prob correctly ~0%
+D for both (Cruz/Trump won TX comfortably). No leftover precinct-level rows.
+SIX states now fully live: NC, GA, PA, AZ, MI, TX. Of these, only NC/GA/MI/TX actually
+gate the Nov 3, 2026 general (PA and AZ were built ahead of their own 2026 races — PA's is
+2028, AZ's Senate is 2028 too — serving as mechanism-proving + 2028 prep, which the user
+had already implicitly signed off on by asking for them in order).
+
+---
+
+## 2026-07-17 (cont.) — AZ + MI WIRED END-TO-END ✅ (4th + 5th live states, primary-night-ready)
+
+User asked to get AZ (Jul 21 primary) and MI (Aug 4 primary) fully prepped for their
+upcoming live tests. Both are now code-complete, not just mapped.
+
+**AZ**: `results.arizona.vote` is a Cloudflare SPA, but its DATA lives on a separate open
+CDN (`cdn1.arizona.vote`, plain httpx, no Cloudflare — confirmed via `results.arizona.vote`
+returning `cf-mitigated: challenge` on direct httpx, while the CDN 200s cleanly). Discovered
+via real-Chrome network inspection (the in-app Browser tool passed AZ's Cloudflare challenge
+fine; a Playwright/httpx direct hit does not). Two-step fetch: `election_{eid}_{jid}.json`
+for the current `uploadId`, then ONE `all_county_races_{eid}_{jid}_en_{uploadId}.json` call
+returns EVERY county x EVERY race (simpler than GA/PA — no per-county or per-race loop).
+Party is a "(CODE)" suffix — on ChoiceName for general elections, on ContestName for
+primaries (AZ splits each party into its own primary contest row) — `az_live_feed.py`
+checks both. electionIds are STABLE and already listed on results.arizona.vote's own
+election-history page (no discovery needed): 2026 primary = 68, 2024 general = 47, etc.
+(`az_election_ids()`). Added `etl_az_county_baseline.py` (NC/GA/PA pattern) for President
+2024 + Senate 2024. Validated vs the 2024 general: 15/15 counties, President Trump
+1,770,242 R / Harris 1,582,860 D, Senate Gallego 1,676,335 D / Lake 1,595,761 R — both
+exact match to certified. Ran the analytics engine directly against populated results_live:
+100% reporting, shift≈0, win_prob correct both ways. Additionally SMOKE-TESTED the actual
+live 2026 primary structure (electionId 68, "Governor (DEM)", scratch race_type
+`az_primary_test`): uploadId discovery worked (12868), all 15 counties matched, primary-style
+party parsing (from ContestName since ChoiceName has no suffix) correctly resolved "Hobbs,
+Katie" → DEM, 0 votes / 0 precincts reporting as expected 4 days out. Test rows cleaned up
+after. AZ has NO President/Senate race on its own 2026 primary ballot (Senate is Class 3,
+next up 2028) — Jul 21 will be a mechanics validation only (uploadId/PrecinctsReported
+changing live), using Governor as the real vehicle, not a manifest data load.
+
+**MI**: confirmed `mvic.sos.state.mi.us` blocks BOTH headless Playwright AND plain httpx
+(403 "Just a moment" on every request, including the download endpoint) — but a HEADED
+Chromium with `navigator.webdriver` masked passes cleanly (tested directly: headless
+Playwright.request → 403; headed Playwright + in-page fetch() → 200, full 1.5MB zip).
+Found a much better mechanism than the county/township/precinct UI drill-down: `/VoteHistory/
+GetPrecinctResultsFile?electionId={N}` returns ONE bulk ZIP for the WHOLE STATE — every
+precinct x every office, tab-delimited, fully documented by a readme.txt inside the zip
+itself (same shape as NC's bulk file). `mi_live_feed.py` drives a headed Playwright browser,
+fetches + unzips this in-memory, and aggregates precinct rows to county totals (83 counties,
+office code 1=President/5=Senate). Added `etl_mi_county_baseline.py` for President 2024 +
+Senate 2024. One county-name wrinkle: MI's file abbreviates "GD. TRAVERSE" for Grand
+Traverse County — added an alias map (`COUNTY_ALIASES`); our DB already carried both
+"ST CLAIR"/"ST. CLAIR" and "ST JOSEPH"/"ST. JOSEPH" spellings so period-stripping handles
+those without a fips collision (checked — the unpunctuated variants have 0 historical rows).
+Validated vs the 2024 general: 83/83 counties, President Trump 2,816,636 R / Harris
+2,736,533 D, Senate Slotkin 2,712,686 D / Rogers 2,693,680 R — EXACT match to certified
+(not just within tolerance). electionId is NOT pre-published like AZ's — MI only adds an
+election to the `#ElectionDateId` dropdown once configured in their system; confirmed the
+Aug 4, 2026 primary is NOT there yet (as of today), so `mi_live_feed.py` auto-discovers the
+id by date-matching that dropdown each run and exits cleanly with "NOT FOUND, retry closer
+to the night" rather than crashing (smoke-tested this path directly). MI Senate (Slotkin's
+seat) IS on the `general2026` manifest already with "TBD AUG 4" placeholders — replace with
+real nominee names once the primary decides them. Needs a machine with a real display
+(headed browser) — won't run on Render or a headless CI box.
+Added `playwright` to requirements.txt (previously just a commented-out "planned" note) —
+it's now a hard runtime dependency for MI specifically, not just a one-time discovery tool.
+FIVE states now fully live: NC, GA, PA, AZ, MI.
+
+---
+
+## 2026-07-17 — PA WIRED END-TO-END ✅ (3rd live state)
+
+`ingestor/pa_live_feed.py`: PA runs its OWN election-night system at
+electionreturns.pa.gov — NOT Clarity, NOT Enhanced Voting (an AngularJS SPA over an
+open ASP.NET API; discovered via Playwright network-request inspection, then
+confirmed OPEN to plain httpx — no Incapsula block on the API paths despite the WAF
+resource loads visible on the page). Key endpoints: `GetAllElections` (full election
+list + electionid), `GetOfficeNames` (officeId per race), `GetCountyBreak?officeId=
+&electionid=&electiontype=` → `{"Election":{"Statewide":[{"ADAMS":[...],
+"ALLEGHENY":[...], ...}]}}` — one key per county (67, exact-name match to our county
+column, no crosswalk needed), each row carrying Votes AND a live ballot-mode split
+(ElectionDayVotes/MailInVotes/ProvisionalVotes — PA has no early in-person voting, so
+only 3 modes vs NC's 4). Maps to PA-{fips}-CTY → results_live per mode. Clears ALL
+PA-% live rows first (same leftover-contamination guard as NC/GA).
+Added `ingestor/etl_pa_county_baseline.py` (NC-pattern) — converts PA's existing
+precinct-level President 2024 + Senate 2024 baselines to county-pseudo (67 PA-CTY
+precincts; precinct-level rows for those race/years removed).
+Validated end-to-end against the 2024 general (electionid 105, both races on one
+ballot): 67/67 counties, **Senate: Casey 3,384,180 D / McCormick 3,399,295 R (49.9%)
+— exact match to certified**; **President: Harris 3,423,042 D / Trump 3,543,308 R
+(49.1%) — exact match to certified**. Ran `analytics.compute_state_analytics` directly
+against the populated results_live (not the replay path) for both races: 100%
+reporting, shift ≈0 (expected — baseline and live are the same certified election),
+win_prob correctly favors R in both (41.2% D senate — close race; 4.2% D president —
+clearer margin), all 67 counties rolled up. THREE states now fully live: NC, GA, PA.
+PA is actually the RICHEST of the three — live ballot-mode split (like NC) AND single
+open plain-httpx call for all counties per race (like GA, but even simpler — one
+GetCountyBreak call returns all 67 counties, no per-county fetch loop needed).
+NOTE: PA isn't on the `general2026` manifest (Senate is Class 3, next up 2028) — this
+was validated as a standalone archived-election test, matching the CONTEXT.md plan.
+
+---
+
 ## 2026-07-06 (cont.) — GA WIRED END-TO-END ✅ (2nd live state)
 
 `ingestor/ga_live_feed.py`: reads GA's OPEN Enhanced Voting API — state feed lists

@@ -26,9 +26,29 @@ this brief was written:
   (note box + ballot-type selector) + turnout/pending county columns + `mode_breakdown()` +
   `/api/state/{abbr}/county/{cty}` + a synthetic red-mirage test scenario. Highest-leverage
   real-night feature.
-- **Live feeds ≠ all Clarity** (`FEED_AUDIT.md`): GA=Clarity statewide; PA/TX/MI=county-level
-  Clarity; AZ/NV=own systems; NC=own dashboard (best — has by-voting-method); WI=no statewide
-  feed (hardest). ⭐ Consider an **AP Elections API**. Dataverse/MIT is the BASELINE, not a feed.
+- **Clarity is DEAD for our states — EXCEPT SC** (`FEED_AUDIT.md`) — every state we've
+  mapped runs its OWN system now, not the old per-county Clarity assumed early on (SC is
+  the one genuine exception — its Clarity instance is still fully alive). **7 states WIRED
+  END-TO-END + validated (2026-07-17):** NC (own dashboard, open S3 bulk file, live
+  ballot-mode split), GA (Enhanced Voting API, totals only), PA (own AngularJS SPA/API,
+  live ballot-mode split, one call = all 67 counties), AZ (own CDN, one call = all 15
+  counties x all races, electionIds pre-published), MI (own system, Cloudflare blocks
+  headless — a HEADED Playwright browser passes; one bulk ZIP = every precinct x every
+  office statewide), TX (own system, Cloudflare WAF blocks plain httpx but headless
+  Playwright passes; one call = all 254 counties keyed by FIPS directly, no name-matching),
+  and **SC — a NEW 9th state** (not one of the original 8; baseline built from scratch via
+  `etl_sc_baseline.py`, since `etl_baseline.py` is destructive and can't be reused for
+  this — its live Clarity ENR is the simplest of any state, plain httpx, one call = all 46
+  counties). SC's real 2026 nominees (Graham R vs Andrews D) came straight off its own June
+  2026 primary results. **NV and WI are DEPRIORITIZED, not unwired-by-oversight** — checked
+  directly against `api/elections.py`: neither has a Senate or President race on the Nov 3,
+  2026 ballot (both Class 3, next up 2028) — so neither gates this November. WI is
+  additionally the hardest case (no statewide feed — 72 county clerk sites); AP Elections
+  API was priced project-wide AND re-checked WI-specific — still quote-only, no shortcut
+  found either time. ⚠️ Production DB is a static release snapshot — SC and all the
+  county-pseudo work are LOCAL ONLY until baseline.db is re-published. See `PROGRESS.md`
+  for the discovery details per state and `CONTEXT.md` for the Jul 21 (AZ) / Aug 4 (MI)
+  election-night runbook.
 - **New docs:** DEPLOY · FEED_AUDIT · TESTING · DATA_SETUP · PREP (all in CONTEXT.md doc map).
 
 The architecture, model, panel concepts, and data approach below remain accurate.
@@ -238,20 +258,31 @@ Still optional (not downloaded):
 
 ## 🔴 LIVE DATA SOURCES (Election Night)
 
-Most swing states use Clarity Elections software — free public XML feeds:
+**OUTDATED — this list assumed Clarity everywhere; it doesn't. Clarity's old endpoints are
+confirmed DEAD/decommissioned for every state we've checked.** The real, verified-working
+per-state sources (as of 2026-07-17) are:
 
-  Georgia:       https://results.enr.clarityelections.com/GA/{election_id}/
-  Pennsylvania:  https://results.enr.clarityelections.com/PA/{election_id}/
-  Arizona:       https://results.enr.clarityelections.com/AZ/{election_id}/
-  Nevada:        https://results.enr.clarityelections.com/NV/{election_id}/
-  Texas:         https://results.enr.clarityelections.com/TX/{election_id}/
-  North Carolina: https://er.ncsbe.gov/
-  Wisconsin:     Wisconsin SOS direct feed
-  Michigan:      Michigan SOS direct feed
+  Georgia:        Enhanced Voting API, results.sos.ga.gov (`ga_live_feed.py`)
+  North Carolina: own dashboard, open S3 bulk file, er.ncsbe.gov (`nc_live_feed.py`)
+  Pennsylvania:   own AngularJS SPA/API, electionreturns.pa.gov (`pa_live_feed.py`)
+  Arizona:        own CDN, cdn1.arizona.vote (`az_live_feed.py`)
+  Michigan:       own system, mvic.sos.state.mi.us — Cloudflare-gated, needs a HEADED
+                  Playwright browser (`mi_live_feed.py`)
+  Texas:          own system, results.texas-election.com — Cloudflare WAF-gated, but
+                  headless Playwright passes (`tx_live_feed.py`)
+  South Carolina: NEW 9th state (2026-07-17) — own Clarity ENR, enr-scvotes.org, STILL
+                  ALIVE (the one exception to "Clarity is dead") — plain httpx, no
+                  Cloudflare at all (`sc_live_feed.py`)
+  Nevada:         DEPRIORITIZED — no Senate/President race on the Nov 2026 ballot
+                  (Class 3 seat, next up 2028)
+  Wisconsin:      DEPRIORITIZED (same reason as NV) — ALSO no statewide feed exists — 72
+                  county clerk sites, or an AP aggregator (AP priced project-wide AND
+                  re-checked WI-specific — still too costly/quote-only either time)
 
-{election_id} changes each election — fetch from SOS website before election night
-Python library: pip install clarify (github.com/openelections/clarify)
-Poll every 60 seconds. Skip if version unchanged since last poll.
+Election IDs change each election. AZ's are pre-published & stable (see
+`az_election_ids()` in az_live_feed.py); the others are auto-discovered per run (see each
+script's docstring). Full per-state discovery notes → `FEED_AUDIT.md`; election-night
+runbook (AZ Jul 21 / MI Aug 4) → `CONTEXT.md`.
 
 ---
 

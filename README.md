@@ -184,6 +184,7 @@ python analytics/engine.py GA president 2020        # replay Georgia 2020
 ## Project docs
 | File | Purpose |
 |------|---------|
+| `OVERVIEW.md` | What exists so far + what's still planned — the "explain it to someone new" summary |
 | `CONTEXT.md` | Current state — start here each session |
 | `DASHBOARD_GUIDE.md` | How to read, run, and simulate the dashboard |
 | `TESTING.md` | Plain-language test guide: what to click, what you should see |
