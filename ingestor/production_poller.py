@@ -206,12 +206,36 @@ def run(tasks: list[PollTask], once: bool):
             time.sleep(5)   # nothing due yet — check again shortly
 
 
+# ---------------------------------------------------------------------------
+# MI PRIMARY NIGHT config (Aug 4, 2026) — a real live target, but NOT the
+# same race_type general2026 tracks (that's the Nov 2026 general, a
+# different election entirely). Writing real Aug 4 primary data under
+# race_type='senate' would corrupt the correct, already-validated Nov
+# tracking data (the exact mistake found & fixed earlier for MI/TX/NC) —
+# so this uses a scratch race_type, same pattern as AZ's Jul 21 test.
+# Delete `WHERE race_type='mi_primary_2026'` afterward if you want it gone;
+# harmless to leave, since no election manifest ever references that name.
+# ---------------------------------------------------------------------------
+def build_mi_primary_tasks() -> list[PollTask]:
+    return [
+        PollTask("MI primary (8/4/2026)", 90,
+                  lambda: mi_live_feed.ingest(
+                      mi_live_feed.discover_election_id("8/4/2026"), "mi_primary_2026"),
+                  enabled=_mi_available()),
+    ]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["test", "prod"], default="test")
+    parser.add_argument("--mode", choices=["test", "prod", "mi-primary"], default="test")
     parser.add_argument("--once", action="store_true",
                         help="single pass through all tasks, then exit (for smoke-testing)")
     args = parser.parse_args()
 
-    task_list = build_test_tasks() if args.mode == "test" else build_production_tasks()
+    if args.mode == "test":
+        task_list = build_test_tasks()
+    elif args.mode == "mi-primary":
+        task_list = build_mi_primary_tasks()
+    else:
+        task_list = build_production_tasks()
     run(task_list, once=args.once)
