@@ -94,8 +94,11 @@ mechanism actually used by every wired state (NC/GA/PA/AZ/MI/TX).
       counties) — via a headed Playwright browser + a bulk-ZIP endpoint (not per-county
       Clarity — that assumption was wrong; MI runs its own system).
 - [ ] **On the night:** the election isn't in MI's dropdown yet (checked 2026-07-17) —
-      poll `mi_live_feed.py "8/4/2026" senate` in the days before to catch it appearing,
-      then run the runbook in CONTEXT.md. Needs a machine with a real display.
+      poll `mi_live_feed.py "8/4/2026" senate` (discovery-only, safe to run repeatedly
+      before the id appears) in the days before to catch it appearing. Once it appears,
+      switch to `mi_live_feed.py "8/4/2026" senate mi_primary_2026` (3rd arg = scratch DB
+      label) so real primary data doesn't land under the real tracked `senate` race_type
+      — see CONTEXT.md's runbook for why. Needs a machine with a real display.
 
 **Aug 11 — Wisconsin primary** — ⚪ **DEPRIORITIZED 2026-07-17.** WI has no Senate or
 President race on the Nov 3, 2026 ballot (Class 3 seat, next up 2028) — confirmed against

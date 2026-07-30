@@ -1,72 +1,71 @@
-We're continuing the Election Forecast Dashboard (C:\Users\subho\election-forecast).
-Read CONTEXT.md first — the "🔴 NEXT SESSION — START HERE → LIVE-READINESS" section
-has the full current state — then NEXT_SESSION_PROMPT.md.
+We're continuing the Election Forecast Dashboard (C:\Users\subho\election-forecast), a
+Nov 3, 2026 election-night forecasting tool. Read CONTEXT.md first — its "SCHEDULE"
+table near the top and "Deployment facts" section have the current state — then
+NEXT_SESSION_PROMPT.md. Full story of the most recent work session is in PROGRESS.md's
+2026-07-18 entry.
 
-Where we are: dashboard is deployed & public (Vercel + Render, CORS locked). We're in
-LIVE-READINESS — wiring each state's live results feed into results_live using the
-county-pseudo-precinct pattern ({ST}-{fips}-CTY), so the analytics run unchanged on
-election night. 7 states are DONE and validated:
-  - NC, GA, PA, AZ, MI, TX — the original 6 (of 8) target states, all validated to the
-    exact certified 2024 general result (nc_live_feed.py/nc_ingestor.py, ga_live_feed.py,
-    pa_live_feed.py, az_live_feed.py, mi_live_feed.py, tx_live_feed.py + matching
-    etl_*_county_baseline.py each). AZ/MI are PRIMARY-NIGHT READY for Jul 21 / Aug 4 — see
-    CONTEXT.md's runbook. MI needs a HEADED browser at runtime; TX only needs headless;
-    the rest are plain httpx.
-  - SC — a NEW 9th state, not one of the original 8 (had zero data loaded before this).
-    Added because SC's Senate seat (Graham, Class 2) IS up in 2026, same class as
-    GA/MI/NC/TX. Baseline loaded from scratch via etl_sc_baseline.py (do NOT use the
-    original etl_baseline.py to add a state — it drops+rebuilds the whole DB from its 5
-    hardcoded sources, destroying every other state's live-feed work). Live feed:
-    sc_live_feed.py — SC's Clarity ENR (enr-scvotes.org) is the ONE place the classic
-    Clarity mechanism (current_ver.txt) is still fully alive, plain httpx, no
-    Cloudflare/WAF/Playwright at all — the simplest state wired this project. Validated
-    against SC's real June 2026 primary (exact statewide + per-candidate match, 46/46
-    counties). Real 2026 nominees are in the manifest: Lindsey Graham (R, incumbent) vs
-    Annie Andrews (D) — pulled directly from the June primary results. Added SC to
-    api/main.py's EV (9) + STATE_NAMES dicts (REQUIRED — the states endpoint sums EV
-    unconditionally and crashes without it). Did NOT add SC to ALL8/the demo election —
-    scoped to general2026 only.
+Where we are (as of 2026-07-18): 9 states of data, 7 with live feeds validated to exact
+certified results — GA, NC, PA, AZ, MI, TX, SC all have working *_live_feed.py scripts
+proven to match certified historical results exactly (see TESTING.md §8). Only WI and NV
+lack a live feed — NV doesn't matter (no 2026 race at all); WI is low-priority (no
+statewide feed, 72 county clerk sites, not in general2026's tracked senate list either).
 
-Production DB is a static release snapshot (GitHub Release db-v1) — SC (and all the
-county-pseudo baselines from this session) are LOCAL ONLY until someone re-gzips and
-re-uploads baseline.db.gz. Nothing pushed to the release yet.
+Production is deployed and live: Vercel (frontend) + Render (backend), now on Starter
+tier with a 1GB persistent disk, DB republished as GitHub Release db-v3 (fixed a real
+data-integrity bug found this session — MI/TX's 2020 Senate baseline had never been
+converted to county-pseudo, and results_live for MI/TX/NC held stale/wrong data).
 
-NV and WI remain DEPRIORITIZED — neither has a Senate or President race on the Nov 3, 2026
-ballot (both Class 3, next up 2028; confirmed against api/elections.py). WI is additionally
-the hardest case (no statewide feed, 72 county clerk sites); AP Elections API re-priced
-WI-specific, still quote-only, no shortcut found. Revisit both ahead of general2028
-whenever there's runway — not urgent.
+A production poller now exists (ingestor/production_poller.py) — a real scheduler that
+wraps every state's ingest() call on its own interval, deployed inside the Render web
+service (launched from entrypoint.sh, gated by ENABLE_POLLER/POLLER_MODE env vars). It
+is currently OFF in production — deliberately, to avoid pointless polling before MI's
+Aug 4 primary even has a live electionId. Dockerfile now has Xvfb + Playwright/Chromium
+baked in, so MI's headed-browser requirement works on Render too (confirmed working).
 
-Clarity is DEAD everywhere checked EXCEPT SC (genuinely still alive there — don't assume
-"Clarity = dead" as a blanket rule, verify per state). Playwright is a hard runtime
-dependency for MI (headed) and TX (headless); everything else (NC/GA/PA/AZ/SC) is plain
-httpx.
+The concrete near-term plan, in order:
+  1. Jul 21, 2026 — AZ primary. Pure mechanics smoke test, no manifest change needed (AZ
+     isn't tracked by general2026, only general2028 eventually).
+  2. ~Aug 2-3, 2026 — turn the poller on. Render -> service -> Environment tab -> set
+     ENABLE_POLLER=1 and POLLER_MODE=mi-primary -> save (auto-redeploys). Runs
+     build_mi_primary_tasks(): polls MI's Aug 4 primary every 90s, auto-discovering the
+     electionId from "8/4/2026", writing under scratch race_type mi_primary_2026 (never
+     the real senate race_type — that would corrupt the just-fixed Nov 2026 tracking
+     data). Verify in Render's Logs tab that it actually finds the election BEFORE
+     Aug 4 itself.
+  3. Aug 4, 2026 — MI primary, live. Watch it run for real. Afterward: set
+     ENABLE_POLLER=0 again, and replace the "TBD AUG 4" candidate placeholders in
+     api/elections.py's general2026 manifest with MI's actual nominees (small code push,
+     not a DB change).
+  4. Decide about the Starter subscription after Aug 4 — fine to let it ride, or pause
+     and resume before the October dry run (prorating a few days doesn't matter).
+  5. Aug 11, 2026 — WI primary, if there's spare runway (optional, not gating Nov 3).
+  6. Mid-late Oct, 2026 — the real unlock: GA/MI/NC/TX/SC publish their actual Nov 3
+     general-election IDs. Fill these into production_poller.py's
+     build_production_tasks() (currently _tbd() placeholders) — mechanical, not new
+     engineering.
+  7. ~2 weeks before Nov 3 — full end-to-end dry run against the real 0%-reporting
+     general pages, all 5 tracked states.
+  8. Election week -> Nov 3 — final rehearsal, then ENABLE_POLLER=1 / POLLER_MODE=prod
+     for the real thing.
 
-The plan, in order — do these:
-  1. WI — only if there's spare runway; see CONTEXT.md's scoping note first (survey a
-     handful of real county sites, don't commit blind). Not gating Nov 2026 — treat as
-     2028 prep. Aug 11 primary is a free test window if picked up.
-  2. NV — same low urgency as WI; revisit whenever convenient for 2028 prep.
-  3. Before Jul 21 / Aug 4: nothing left to BUILD for AZ/MI — just run the runbook
-     commands in CONTEXT.md on the actual nights and report the live validation results.
-  4. Whenever convenient: re-gzip + re-upload baseline.db to the GitHub Release so SC (and
-     the rest of this session's work) actually reaches production — see DEPLOY.md. Also
-     get SC's Nov 2026 electionId once enr-scvotes.org/SC/elections.json populates it
-     (currently empty).
+Gotchas (still true, carried forward): baseline.db is gitignored — production only picks
+up local DB changes when you re-gzip + re-upload as a new GitHub Release and update
+Render's DB_URL env var (current tag: db-v3). Never run
+python ingestor/etl_baseline.py to add a state or year — it drops and rebuilds the whole
+DB from 5 hardcoded sources, destroying every live-feed county-pseudo baseline built
+since (SC's loader, etl_sc_baseline.py, is additive on purpose). /api/states reads a
+pre-computed cache (live_snapshots) that only refreshes when empty for a state+race — if
+numbers look stale after writing new results_live rows, clear the relevant snapshot rows
+rather than assuming the write failed. Always use a scratch race_type (not a real
+tracked one like senate) for any primary-night mechanics test or early live-fire test —
+this is exactly the MI/TX/NC bug fixed this session. MI needs a headed browser (works
+locally on any machine with a real display, and now also on Render via Xvfb); TX only
+needs headless; everything else (NC/GA/PA/AZ/SC) is plain httpx. Clarity is dead
+everywhere checked except SC (still genuinely alive there) — verify per state, don't
+assume. API runs without --reload: restart uvicorn + click Reset in the UI after any
+api/ingestor code change.
 
-Gotchas: every *_live_feed.py must DELETE ... WHERE precinct_id LIKE '{ST}-%' first (not
-just -CTY) or leftover precinct-level rows double-count. Party may be embedded in the
-candidate NAME suffix OR the CONTEST name suffix (check both). SC's contest names have
-literal DOUBLE SPACES ("U.S.  Senate  - REP") — substring-match, don't rely on exact
-string equality. Each state needs a county-pseudo baseline too unless one already exists.
-Adding a state NOT in the original 8 (like SC) is a bigger job than wiring a live feed for
-an existing one: write a dedicated additive baseline loader (never touch the original
-etl_baseline.py — it's destructive), then add EV/STATE_NAMES entries in api/main.py
-(required, not cosmetic). baseline.db is gitignored, so local DB changes don't touch
-production (see the note above about re-publishing). API runs without --reload → restart
-uvicorn + click Reset in the UI after api/ingestor changes. MI needs a HEADED browser at
-runtime; TX only needs headless. Before committing to a state, check whether it actually
-has a race on the CURRENT election's manifest (api/elections.py) — NV/WI didn't.
-
-Nothing is queued to build right now beyond WI/NV (both low-urgency). Report findings at
-each step before moving on if picking either up (my working rule).
+Longer-term / not urgent: WI and NV live feeds (general2028 prep only); precinct-level
+drill-down for GA/NC (optional precision upgrade, not required for Nov 3); general2028
+needs 2022 Senate data loaded (already on disk at
+data/raw/2022-SENATE-precinct-general.csv, just not loaded into the DB yet).

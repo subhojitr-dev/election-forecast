@@ -5,6 +5,156 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-07-30 — found & fixed a real bug in the MI Aug-4-primary plan: `mi_live_feed.py`
+## conflated OFFICE selection with the DB scratch label, would have crashed on the night
+
+While scoping "test the MI Democratic primary Tuesday night" (Aug 4, 2026 — confirmed
+that IS a Tuesday, so this is just the already-planned Aug 4 live validation, no new
+date), re-checked the actual code behind the plan and found `mi_live_feed.py`'s
+`ingest(election_id, race_type)` used the single `race_type` argument for **two
+different things**: looking up the office code (`OFFICE_CODE["senate"] = "5"` — only
+`"president"`/`"senate"` are valid dict keys) AND labeling the rows written to
+`results_live`. Every doc written on 2026-07-18 (CONTEXT.md, PROGRESS.md,
+NEXT_SESSION_PROMPT.md, TESTING.md, PREP.md) and `production_poller.py`'s
+`build_mi_primary_tasks()` assumed you could pass the scratch label `"mi_primary_2026"`
+straight in as that argument — which would have thrown `KeyError: 'mi_primary_2026'`
+the moment it actually ran on Aug 4, since that string isn't a real office key.
+
+**Fixed:** added a separate `db_race_type` parameter to `ingest()` (defaults to
+`race_type` if omitted, so existing real-race calls are unaffected) — `race_type` now
+purely selects the office, `db_race_type` is what gets written to the DB. Updated:
+- `mi_live_feed.py`'s CLI (`__main__`) to accept an optional 3rd positional arg for
+  the scratch DB label — e.g. `python ingestor/mi_live_feed.py "8/4/2026" senate
+  mi_primary_2026`.
+- `production_poller.py`'s `build_mi_primary_tasks()` to call
+  `ingest(eid, "senate", db_race_type="mi_primary_2026")`.
+- `production_poller.py`'s test-mode MI task, which had the *same* latent bug in the
+  other direction — it wrote real 2024-general data straight into the REAL `senate`
+  race_type (not a scratch one), which would have corrupted the 2020-baseline
+  `general2026` comparison if ever run on a Linux/Xvfb host (never triggered locally
+  since MI's test task auto-disables on Windows, but would be live on Render). Now uses
+  `db_race_type="mi_poller_test"`.
+- CONTEXT.md's MI runbook, TESTING.md §8.4/§8.2, and PREP.md's Aug 4 checklist — all
+  now show the correct 3-arg manual command and explain the 2-arg-vs-3-arg split.
+
+**Verified the fix** with a live smoke test against the archived 2024 general
+(`ingest(eid, "senate", db_race_type="mi_fix_smoketest")`): 83/83 counties, exact match
+to the known result (Slotkin 2,712,686 D / Rogers 2,693,680 R), written safely under the
+scratch label with zero effect on the real `senate` rows. Cleaned up the 647 scratch
+rows afterward.
+
+**On the actual question asked:** MI's data format bundles both parties' primary
+candidates into one pull per office (party is embedded per-candidate, unlike AZ's
+separate "Governor (DEM)"/"Governor (REP)" contest names) — so there's no separate
+"Democratic primary only" call to make. Watching the Democratic side specifically on
+Aug 4 just means reading the `dem` total / DEM-party rows out of the single `senate`
+pull, same command as the Republican side.
+
+## 2026-07-21 — AZ primary-night mechanics smoke test: PASS; scheduled-task timing
+## gotcha found (needs app open at fire time)
+
+Ran the AZ Jul 21 primary-night mechanics test from `TESTING.md` §8.4 — `az_live_feed.py`
+against the real 2026 primary (electionId `68`, hardcoded, no discovery needed), Governor
+DEM/REP contests, writing to scratch race_types `az_primary_test_dem`/`az_primary_test_rep`
+so nothing real was touched. **Result: clean PASS.**
+
+- **Before polls closed** (~7 PM ET, 3 hours before AZ's 7 PM local / 10 PM ET close):
+  connected fine, all 15/15 counties returned, correct candidate names resolved (Hobbs
+  DEM; Biggs/Miceli/Neely/Schweikert REP), but votes correctly at 0 — expected pre-close.
+- **After polls closed** (~11 PM ET, over an hour post-close): re-ran both contests twice,
+  a few minutes apart. `uploadId` climbed each poll (12883 → 12898 → 12900) and vote
+  totals moved with it (DEM Hobbs 0 → 9,128; REP field 0 → 4,812 → 10,425) — exactly the
+  pass criteria (uploadId increments, precincts/votes move off zero, not static).
+
+**Gotcha found — scheduled tasks need the app open at fire time.** Set up a one-time
+scheduled task (via the `schedule` skill / `mcp__scheduled-tasks__*`) to fire at 10:30 PM
+ET and run this same test automatically. It did **not** actually fire — checked the DB
+afterward and the only writes present were from an earlier *manual* "Run now" trigger
+(~7:07–7:20 PM ET, used to pre-approve the task's tool permissions ahead of time), not
+from the scheduled 10:30 PM run. The app was apparently not open at 10:30 PM, and the
+task's `nextRunAt` never advanced past its original fire time. Ended up just re-running
+the commands manually once back at the keyboard (~11 PM ET), which is what produced the
+PASS result above.
+
+**Implication for MI's Aug 4 primary**, which plans to lean on this same
+"schedule-a-wake, poll, report" pattern (see `CONTEXT.md`'s MI runbook): don't rely on an
+unattended scheduled task alone to catch the live window. Either (a) keep the app open
+around the target check-in time, or (b) treat any scheduled trigger as a best-effort
+convenience and plan to manually re-run the poll commands after reconnecting, same as
+tonight. This doesn't affect Path A of the MI plan (the Render-hosted `production_poller.py`
+running as a background process inside the always-on Starter-tier web service) — that's a
+server-side loop, not a locally-scheduled task, so it isn't subject to this same
+"app must be open" limitation.
+
+## 2026-07-18 — MI/TX/NC data-integrity bug found & fixed (db-v3); production poller
+## built; Render upgraded to Starter + persistent disk; MI's Xvfb/headed-browser
+## requirement solved in Docker
+
+**The bug (found while double-checking "did anything besides SC change?"):** MI and TX's
+2020 Senate baselines had never been converted to county-pseudo format, and separately,
+`results_live` for MI/TX still held leftover 2024 test data (Slotkin/Rogers,
+Cruz/Allred) that no longer matched the 2020 baseline `general2026` actually tracks —
+NC's `results_live` was worse, completely empty (accidentally deleted during earlier
+TESTING.md verification work and never restored). All three would have shown wrong or
+blank data on the live dashboard. Root cause was pre-existing (not introduced today) but
+had gone unnoticed because `/api/states` serves a pre-computed `live_snapshots` cache
+that only refreshes when empty — it was quietly serving stale numbers.
+
+**Fix:** converted MI/TX 2020 Senate baselines to county-pseudo via the existing
+`etl_mi_county_baseline.py` / `etl_tx_county_baseline.py` `convert()` functions, then
+wrote a repopulation script that deletes and re-inserts `results_live` from
+`results_historical` for MI/TX/NC (a "true replay" matching each state's real tracked
+baseline exactly), then cleared the stale snapshot cache. Verified via
+`engine.compute_state_analytics` directly and against the running local API before
+republishing to production as GitHub Release **`db-v3`** (supersedes `db-v2`/`db-v1`).
+
+**Production poller built** (`ingestor/production_poller.py`) — a real scheduler
+wrapping every state's `*_live_feed.py ingest()` call on its own polling interval, with
+per-task error isolation (one state failing doesn't take down the others), a `--mode
+{test,prod,mi-primary}` switch, and `--once` for smoke tests. `test` mode replays the
+same archived elections validated in TESTING.md §8 end-to-end (GA/NC/PA/TX/SC all
+matched exactly on a local run; MI correctly auto-disabled — no Xvfb on Windows).
+`mi-primary` mode is the concrete Aug 4 plan: polls MI's Aug 4, 2026 primary under a
+**scratch race_type `mi_primary_2026`**, deliberately NOT the real `senate` race_type,
+to avoid corrupting the just-fixed Nov 2026 tracking data (the exact class of bug fixed
+above). `prod` mode's tasks are mostly `_tbd()` placeholders — the real Nov 2026
+election IDs for GA/MI/NC/TX/SC won't be published until mid–late October.
+
+**MI's headed-browser requirement solved for Render:** added Xvfb + `playwright install
+--with-deps chromium` to the Dockerfile; confirmed a successful build on Render (Events
+tab showed green "Deploy live"). `entrypoint.sh` now optionally launches the poller in
+the background before `exec uvicorn`, gated by `ENABLE_POLLER`/`POLLER_MODE` env vars —
+currently OFF in production by design (no point polling for 2+ weeks before MI's
+election even exists; plan is to flip it on ~Aug 2–3).
+
+**Render upgraded to Starter tier ($7/mo, subscribed today)** with a **1GB persistent
+disk mounted at `/app/data/db`** — decided now rather than waiting for October, since
+MI's Aug 4 primary is the next real live-fire test and needs somewhere for the poller to
+actually run continuously. Architecture note worth remembering: the poller runs
+IN-PROCESS inside the same web service as the API, not as a separate Render Background
+Worker — Render's own UI confirmed disks can't be shared across services ("Other
+services can't access this service's disk"), so a separate worker couldn't have reached
+the DB anyway.
+
+**Also added South Carolina as a 9th tracked state** (SC's primary was already over,
+making it ready for Nov prep) — additive loader `etl_sc_baseline.py` (President
+2020/2024 + Senate 2020), live feed via classic Clarity (`enr-scvotes.org`), wired into
+`general2026` with real June 2026 primary nominees (Graham R / Andrews D). Two bugs
+fixed along the way: a PRIMARY KEY violation from inserting precincts per-dataset instead
+of deduped across all three (fixed by unioning before insert), and a live-feed doubling
+bug from a pseudo-county literally named `"-1"` in SC's data (fixed by excluding it).
+
+**Full documentation refresh across the project** (this entry included) — CONTEXT.md's
+schedule table, election-night runbook, deployment facts, and pending-work section;
+TESTING.md's new §8 (live-feed validation, GA walkthrough covering all three GA races
+after a correction — see the 2026-07-17 entry below); OVERVIEW.md (new file, full
+project summary + roadmap); NEXT_SESSION_PROMPT.md and newsession_prompt.md rewritten
+for a clean fresh-session handoff.
+
+**Next up:** flip `ENABLE_POLLER=1`/`POLLER_MODE=mi-primary` on Render ~Aug 2–3; verify
+it finds MI's electionId before Aug 4; watch it run live on Aug 4; decide whether to keep
+the Starter subscription running or pause it until the October dry run.
+
 ## 2026-07-17 (cont.) — TESTING.md §8 added (live-feed test guide); correction: GA's BOTH
 ## Jan-2021 Senate runoffs ARE fetchable live after all
 

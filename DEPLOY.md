@@ -5,14 +5,15 @@ How to put the dashboard on a public URL. The reference plan is below; the
 
 ---
 
-## ✅ AS-BUILT — live deployment (done 2026-06-30)
+## ✅ AS-BUILT — live deployment (done 2026-06-30; upgraded to Starter 2026-07-18)
 
 | Piece | URL |
 |-------|-----|
 | **Frontend (Vercel)** | **https://election-forecast-silk.vercel.app** |
-| **Backend (Render)** | **https://election-forecast.onrender.com** |
+| **Backend (Render)** | **https://election-forecast.onrender.com** — **Starter tier** + 1GB persistent disk (upgraded 2026-07-18) |
 | **GitHub repo** | github.com/subhojitr-dev/election-forecast (branch `main`) |
-| **DB (GitHub Release)** | tag `db-v1`, asset `baseline.db.gz` (43 MB) |
+| **DB (GitHub Release)** | tag **`db-v3`** (was `db-v1`), asset `baseline.db.gz` — fixes a MI/TX/NC data-integrity bug, see PROGRESS.md 2026-07-18 |
+| **Poller** | `ingestor/production_poller.py`, runs in-process via `entrypoint.sh` — gated OFF by `ENABLE_POLLER` (unset). Plan: turn on ~Aug 2–3 for MI's Aug 4 primary — see CONTEXT.md's MI runbook |
 
 ### A. Backend on Render (do this FIRST — frontend needs its URL)
 1. **render.com** → Sign up **with GitHub** → in the GitHub-app prompt, choose
@@ -46,12 +47,27 @@ On Render → service → **Environment** → add
 `CORS_ORIGINS = https://election-forecast-silk.vercel.app` → save (auto-redeploys).
 Until then the API accepts any origin (`*`), so the site already works.
 
-### Operating notes
-- **Render free tier spins down after ~15 min idle** → first visit then takes
-  ~30–60 s (cold start re-downloads the 43 MB DB). For election night → Starter
-  ($7/mo) + a persistent disk mounted at `data/db/`.
+### Operating notes — UPDATED 2026-07-18
+- **Now on Starter tier ($7/mo) with a 1GB persistent disk** mounted at
+  `/app/data/db` — no more cold starts, disk survives redeploys. (The free-tier
+  15-min-idle spin-down described in earlier notes no longer applies.) Upgraded
+  specifically to support the always-on production poller ahead of MI's Aug 4 primary.
+- **The poller toggle:** Render → service → **Environment** tab → add/edit
+  `ENABLE_POLLER` (`1` to turn on, unset/`0` to turn off) and `POLLER_MODE`
+  (`test` / `mi-primary` / `prod`). Saving auto-redeploys. Currently OFF.
+  `entrypoint.sh` reads these and optionally launches
+  `ingestor/production_poller.py --mode "$POLLER_MODE"` in the background before
+  starting uvicorn — see the script itself for the exact logic.
+- **Dockerfile now also installs Xvfb + `playwright install --with-deps chromium`**
+  (added 2026-07-18) so MI's headed-browser live-feed requirement can run on Render,
+  not just on a local machine with a real display.
 - **Updating the app:** push to `main` → both Vercel and Render auto-redeploy.
-- **Updating the DB:** re-gzip `baseline.db`, upload a NEW release asset, update `DB_URL`.
+- **Updating the DB:** re-gzip `baseline.db`, upload a NEW release asset (new tag,
+  e.g. `db-v4`), update `DB_URL` in Render's Environment tab (auto-redeploys).
+- **One-Off Jobs** (Render → service → Jobs tab) now available since upgrading to
+  Starter — useful for one-time DB repair/repopulation scripts without needing a
+  full redeploy, though most of today's DB fixes were still done by editing the DB
+  locally and republishing a new release (simpler, no Render-side script upload needed).
 
 ---
 

@@ -1,14 +1,32 @@
 # CONTEXT.md — START HERE EACH SESSION
 # Election Forecast Dashboard — current-state snapshot
-# Last updated: 2026-07-17 (LIVE-READINESS underway — CORS locked; NC+GA+PA+AZ+MI+TX+SC
-#                           WIRED END-TO-END (7 live states — SC is a NEW 9th state, not
-#                           one of the original 8, baseline loaded from scratch); AZ + MI
-#                           primary-night-ready for Jul 21 / Aug 4; NV+WI DEPRIORITIZED (no
-#                           2026 race); Clarity confirmed dead everywhere but SC (still alive
-#                           there); plan: WI (2028 prep) whenever there's spare runway)
+# Last updated: 2026-07-18 (7 states WIRED END-TO-END, all validated + LIVE ON PRODUCTION
+#                           (db-v3, deployed); found+fixed a real data bug (MI/TX's 2020
+#                           Senate baseline was never county-converted, NC's live data had
+#                           been emptied by testing) — all 5 general2026 states now
+#                           consistent; built production_poller.py (the real election-night
+#                           scheduler) + Dockerfile Xvfb/Chromium for MI; Render UPGRADED TO
+#                           STARTER + 1GB persistent disk (/app/data/db); poller wired into
+#                           entrypoint.sh but OFF (ENABLE_POLLER unset) — turn on ~Aug 2-3
+#                           for the Aug 4 MI primary. See "🗓️ SCHEDULE" below.)
 
 > This is the fast on-ramp. Read this first, then `HANDOVER_BRIEF.md` for the
 > full spec. `PROGRESS.md` = chronological log. `Issues.md` = problems + plans.
+
+---
+
+## 🗓️ SCHEDULE — update this as dates come and go
+
+| When | What | Status |
+|---|---|---|
+| **Jul 21, 2026** | AZ primary — mechanics validation (uploadId/precinct-count/vote changes live). Runbook below. | ⬜ upcoming |
+| **~Aug 2–3, 2026** | Set `ENABLE_POLLER=1` + `POLLER_MODE=mi-primary` on Render (Environment tab) — starts the in-process poller checking for MI's Aug 4 election every 90s. Confirm it finds the electionId before the 4th (don't wait until the night itself). | ⬜ upcoming |
+| **Aug 4, 2026** | MI primary — the actual live validation. Poller (running on Render, Starter tier, 1GB disk at `/app/data/db`) fetches real results via headed Chromium + Xvfb, writes to a scratch race_type (`mi_primary_2026`) so it can't corrupt the real `general2026` tracking. Watch it run; confirm real numbers move. | ⬜ upcoming |
+| **After Aug 4** | Set `ENABLE_POLLER=0` again (or leave running harmlessly — it'll just sit idle with nothing to poll). Decide whether to keep the Starter subscription through Oct/Nov or downgrade in between (if downgrading: **back up the DB to a new GitHub Release first** — the persistent disk goes away on Free tier). | ⬜ upcoming |
+| **Mid–late Oct 2026** | States publish the real Nov 3 general at 0% reporting. Discover the real electionIds for GA/MI/NC/TX/SC (AZ/PA not tracked this cycle) and fill them into `production_poller.py`'s `build_production_tasks()` (currently mostly `_tbd()` placeholders). Replace MI's "TBD AUG 4" candidate placeholders in `api/elections.py` with the real Aug 4 primary winners. | ⬜ upcoming |
+| **~2 weeks before Nov 3** | Full dry run: all 5 tracked states × Senate, against each state's live (empty) Nov feed. `--mode prod --once` is the smoke test. | ⬜ upcoming |
+| **Election week (late Oct – Nov 2)** | Final rehearsal. Re-subscribe to Starter if it was downgraded. Confirm disk + poller + `ENABLE_POLLER=1`/`POLLER_MODE=prod`. | ⬜ upcoming |
+| **Nov 3, 2026** | Election night — go live. | ⬜ upcoming |
 
 ---
 
@@ -147,21 +165,65 @@ news-aggregator JSON endpoint.)
     climbing from 0, vote totals moving. Clean up the test rows afterward (`DELETE FROM
     results_live WHERE race_type='az_primary_test'`) — they're not a tracked race.
 
-**MI — Aug 4 primary:**
-  - electionId is NOT yet known — MI hasn't added it to `#ElectionDateId` as of 2026-07-17.
-  - **Days before Aug 4:** re-run `python ingestor/mi_live_feed.py "8/4/2026" senate`
-    periodically — it auto-discovers the id once MI configures it and will print it (or
-    "NOT FOUND, retry closer to the night" until then). Once it succeeds, the id is stable
-    for the rest of the night.
+**MI — Aug 4 primary — UPDATED 2026-07-18, now has TWO ways to run it:**
+
+  **Path A (the real plan): the poller, running on Render itself.**
+  - Render is now on **Starter tier** with a **1GB persistent disk mounted at `/app/data/db`**
+    (upgraded 2026-07-18 specifically for this). The Dockerfile has Xvfb + Chromium +
+    Playwright's OS deps baked in (confirmed working — the build succeeded on Render).
+    `entrypoint.sh` optionally launches `production_poller.py` in the background alongside
+    uvicorn, in the SAME service (not a separate Render service — Render doesn't let two
+    services share one disk anyway, confirmed via the Disk UI: "Other services can't access
+    this service's disk").
+  - **It's currently OFF** (`ENABLE_POLLER` unset in Render's Environment tab) — deliberately,
+    to avoid ~2 weeks of pointless headed-Chromium launches every 90s checking for an election
+    that doesn't exist yet (not "respectful" polling, and wastes Starter-tier resources for no
+    reason). **Turn it on ~Aug 2–3**: set `ENABLE_POLLER=1` and `POLLER_MODE=mi-primary` in
+    Render's Environment tab, save (auto-redeploys). This runs `production_poller.py`'s
+    `build_mi_primary_tasks()` — MI only, polling every 90s, auto-discovering the electionId
+    from `"8/4/2026"`, writing to a **scratch race_type `mi_primary_2026`** (NOT `senate` —
+    writing real Aug 4 primary data under the real race_type would corrupt the already-correct
+    `general2026` tracking, the same mistake found & fixed for MI/TX/NC's 2020 baseline this
+    session — see PROGRESS.md 2026-07-18).
+  - Verify it found the election **before** the night itself (check Render's Logs tab for
+    `mi_primary_2026: OK` instead of `NOT FOUND`), so there's no surprise on Aug 4.
+  - After Aug 4: set `ENABLE_POLLER=0` again (or leave it — it'll just idle harmlessly with
+    nothing new to find until Nov).
+
+  **Path B (fallback / what to do if Path A isn't working): run it manually.**
+  - `python ingestor/mi_live_feed.py "8/4/2026" senate mi_primary_2026` from any machine
+    with a real display (this machine, or the user's) — auto-discovers the id, prints
+    "NOT FOUND, retry closer to the night" until MI configures it. The 2nd arg (`senate`)
+    picks the OFFICE (must stay `senate`/`president`, not a scratch name — those are the
+    only two OFFICE_CODE keys the script understands); the 3rd arg is the scratch DB
+    label the results get stored under, so it can safely be anything (omit it entirely
+    and it defaults to the same value as the 2nd arg — i.e. writes to the REAL `senate`
+    race_type, which is what you want for Nov 3 itself, just not for a primary-night
+    test). Needs `pip install playwright && playwright install chromium` if not already
+    done. This only updates the LOCAL database — has no effect on the public site unless
+    manually synced (gzip → new GitHub Release → update `DB_URL`, same as `db-v2`/`db-v3`).
+  - ⚠️ **This 2-arg-vs-3-arg split was added 2026-07-30** after finding the original
+    2-arg scratch-race_type instructions here (and the equivalent poller code) would have
+    crashed with `KeyError` — `race_type` used to double as both the office selector AND
+    the DB label, so a scratch name like `mi_primary_2026` wasn't valid to pass as the
+    2nd arg at all. Fixed in `mi_live_feed.py`'s `ingest()` (new `db_race_type` param)
+    and `production_poller.py`'s `build_mi_primary_tasks()`. See PROGRESS.md 2026-07-30.
+
+  ⚠️ **Don't rely on a locally-scheduled wake-up/reminder task to catch this window** —
+  tried that for AZ's Jul 21 test (a one-time `mcp__scheduled-tasks__*` trigger set for
+  10:30 PM ET) and it silently never fired; the app wasn't open at that moment, and
+  scheduled tasks only run while the app is open (or on next launch — but "next launch"
+  turned out to be well after the target time here). Ended up just re-running the poll
+  commands manually once back at the keyboard, which worked fine. **This does NOT apply
+  to Path A above** (the Render-hosted `production_poller.py` running inside the
+  always-on Starter-tier web service) — that's a real server-side loop, not a
+  locally-scheduled task, so it keeps polling on its own regardless of whether anyone's
+  local app is open. See PROGRESS.md's 2026-07-21 entry for the full story.
+
   - MI Senate IS on the `general2026` manifest already (`api/elections.py` lists MI with
-    candidates "TBD AUG 4" — confirmed via web search that U.S. Senate is on MI's 2026
-    primary ballot). **Once the Aug 4 primary picks the nominees, replace the TBD
-    placeholders in `api/elections.py` with the real winner names.**
-  - Needs a **headed** browser (a machine with a real display) — this will NOT run
-    headless on a CI box or the Render server. Run it locally from a machine you can see,
-    or over RDP/VNC with a real desktop session (not purely SSH).
-  - `pip install playwright && playwright install chromium` if not already done on the
-    machine you run it from.
+    candidates "TBD AUG 4"). **Once the Aug 4 primary picks the nominees, replace the TBD
+    placeholders in `api/elections.py` with the real winner names** — then re-deploy (a
+    normal code push, not a DB sync).
 
 **Playwright**: used for (a) one-time DISCOVERY of hidden data endpoints on JS/SPA sites
 (GA, PA, AZ — all now use plain httpx after that one-time discovery) and (b) ONGOING
@@ -181,61 +243,83 @@ session touched that release — SC is local-only for now.
 for plan B); live real-time VALIDATION can ONLY happen at each primary. Easy states (open
 data) = fully buildable + testable now against archives.
 
-Reproducible deploy steps + URLs: **DEPLOY.md → "✅ AS-BUILT"**. ⚠️ Render free tier
-spins down after ~15 min idle → first hit ~30–60s cold start (re-downloads the 43 MB DB).
+Reproducible deploy steps + URLs: **DEPLOY.md → "✅ AS-BUILT"**. Starter tier stays up
+24/7 (no more cold starts — see below), so this note about free-tier spin-down no longer
+applies but is left here as history.
 
-### 🚀 Deployment facts (so you don't re-derive them)
+### 🚀 Deployment facts (so you don't re-derive them) — UPDATED 2026-07-18
   - **GitHub:** github.com/subhojitr-dev/election-forecast (branch `main`). Data (CSVs +
     baseline.db, 1.4 GB) is **gitignored** — see DATA_SETUP.md to obtain/rebuild.
-  - **Backend:** Render Docker web service (FREE tier). On boot, `entrypoint.sh` →
-    `download_db.py` fetches baseline.db (43 MB gzip) from a **GitHub Release** (tag
-    `db-v1`, asset `baseline.db.gz`) via the `DB_URL` env var, unzips to data/db/.
-    - ⚠️ Free tier **spins down after ~15 min idle** → first hit after = ~30–60s cold start.
-    - ⚠️ Ephemeral disk → re-downloads DB each boot; sim state resets (fine for demo).
-    - For election night: upgrade to **Starter ($7/mo) + a persistent disk** at data/db/.
-    - **If baseline.db changes:** re-gzip it, upload a NEW release asset, update `DB_URL`.
+  - **Backend:** Render Docker web service, **Starter tier ($7/mo, subscribed 2026-07-18)**
+    with a **1GB persistent disk mounted at `/app/data/db`**. Upgraded specifically to
+    unlock (a) One-Off Jobs / always-on service (no cold starts) and (b) a disk that
+    survives redeploys, which the in-process poller needs (Render confirmed: "Other
+    services can't access this service's disk" — that's WHY the poller runs inside this
+    same web service rather than as a separate Background Worker).
+    - On boot, `entrypoint.sh` → `download_db.py` fetches baseline.db (gzip) from a
+      **GitHub Release** — current tag **`db-v3`** (asset `baseline.db.gz`), via the
+      `DB_URL` env var, unzips to `/app/data/db/`. (`db-v1` and `db-v2` are now
+      superseded — `db-v3` is the one with the MI/TX/NC data-integrity fix, see
+      PROGRESS.md 2026-07-18.)
+    - **If baseline.db changes:** re-gzip it, upload a NEW release asset (new tag,
+      e.g. `db-v4`), update `DB_URL` in Render's Environment tab (triggers auto-redeploy).
+    - **The poller** (`ingestor/production_poller.py`) is deployed in the image and
+      wired into `entrypoint.sh`, but **currently OFF** — `ENABLE_POLLER` is unset in
+      Render's Environment tab. Turn on via `ENABLE_POLLER=1` + `POLLER_MODE=test`
+      (or `mi-primary` / `prod`) — see the MI runbook above for the concrete Aug 4 plan.
+    - Dockerfile now installs Xvfb + `playwright install --with-deps chromium`, so MI's
+      headed-browser requirement works on Render (confirmed: build succeeded, Events
+      tab showed green "Deploy live").
   - **Cache-Control** (max-age=15, swr=30) on /api/states + /api/state = the scale lever.
   - **Local dev still works** unchanged (2 terminals, below) — `VITE_API_BASE` unset = relative.
 
-### 📋 PENDING — EXECUTION ORDER (chronological; full dated timeline in PREP.md)
+### 📋 PENDING — EXECUTION ORDER — UPDATED 2026-07-18 (full dated timeline in PREP.md
+  and the "🗓️ SCHEDULE" table near the top of this file)
 
-  ✅ DONE: deploy (frontend Vercel + backend Render). Small wrap: confirm CORS lockdown
-     saved on Render (CORS_ORIGINS = the Vercel URL).
+  ✅ DONE (as of 2026-07-18):
+     - Frontend on Vercel, backend on Render — deployed, CORS locked to the Vercel URL.
+     - **7 of 9 states have working, validated live-feed ingestors**: GA, NC, PA, AZ, MI,
+       TX, SC — each proven to exactly match certified historical results end-to-end
+       (see TESTING.md §8). Only WI and NV lack a live feed (NV has no 2026 race at all,
+       so it doesn't matter; WI's Aug 11 primary is the next open item — see below).
+     - 9-state data coverage: original 8 (GA/NC/PA/AZ/MI/TX/WI/NV) + **SC added
+       2026-07-17** (President 2020/2024 + Senate 2020, county-pseudo, via the additive
+       `etl_sc_baseline.py`, NOT the destructive `etl_baseline.py`).
+     - `production_poller.py` built and deployed (scheduler wrapping every state's
+       `ingest()` call, per-task error isolation, Xvfb auto-start for MI) — currently
+       OFF in production (`ENABLE_POLLER` unset), by design (see Deployment facts above).
+     - Render upgraded to **Starter tier + 1GB persistent disk** (2026-07-18) —
+       always-on (no cold starts), disk survives redeploys, unlocks One-Off Jobs.
+     - **Data-integrity bug found & fixed 2026-07-18**: MI/TX's 2020 Senate baseline had
+       never been converted to county-pseudo, and `results_live` for MI/TX/NC held
+       stale/wrong-election data. Fixed, verified, republished as **`db-v3`** (see
+       PROGRESS.md 2026-07-18 for the full story).
 
-  Everything below = LIVE-READINESS for Nov 3 (the long pole; gated by the summer primaries,
-  which are the ONLY live-feed test windows — irreplaceable, so the plan is built around them):
+  🔜 NEXT UP, in order:
+  ① Jul 21, 2026 — AZ primary: pure mechanics test (scratch race_type), no manifest
+     change needed — AZ isn't tracked by `general2026` (only `general2028` will use it).
+  ② ~Aug 2–3, 2026 — flip `ENABLE_POLLER=1` / `POLLER_MODE=mi-primary` on Render (see MI
+     runbook above). Verify in Render's Logs tab that it finds MI's Aug 4 electionId
+     BEFORE the night itself.
+  ③ Aug 4, 2026 — MI primary: watch the poller write real results under scratch
+     race_type `mi_primary_2026`; after, replace the "TBD AUG 4" candidate placeholders
+     in `api/elections.py`'s `general2026` with the real nominees (small code push).
+  ④ After Aug 4 — decide: let the Starter subscription ride, or pause/resume before the
+     ~2-week-out dry run in October (either is fine — prorating a few days doesn't matter).
+  ⑤ Aug 11, 2026 — WI primary: WI still has NO live feed built. If pursued, same
+     county-pseudo pattern as the other 7 states; otherwise WI stays simulator-only
+     (acceptable — WI isn't in `general2026`'s senate list either).
+  ⑥ Mid–late Oct, 2026 — the real payoff moment: GA/MI/NC/TX/SC publish their actual
+     Nov 3 general-election IDs. Fill these into `production_poller.py`'s
+     `build_production_tasks()` (currently all `_tbd()` placeholders) — this is a small,
+     mechanical edit once the IDs are known, not new engineering.
+  ⑦ ~2 weeks before Nov 3 — full end-to-end dry run against the real (0%-reporting)
+     general-election pages, all 5 tracked states.
+  ⑧ Election week → Nov 3 — final rehearsal, then flip `ENABLE_POLLER=1` /
+     `POLLER_MODE=prod` for the real thing.
 
-  ① NOW → mid-July (foundation — start immediately)
-     - ✅ DECIDED 2026-06-30: AP Elections API **SKIPPED** (enterprise/quote-only, likely
-       $thousands/cycle — not worth it for a solo build). Going with the FREE state ENR
-       feeds (Clarity + own systems). Revisit AP only if budget/scope changes. So build
-       the feeds directly:
-     - Build the NC ingestor (easiest; its dashboard has by-voting-method data) — proves the
-       non-Clarity path and gives a clean second feed.
-     - Start the Clarity 403 fix (Issue #1) — gates GA/PA/TX/MI.
-  ② Jul 21 — AZ primary (live test #1): pull AZ's COUNTY feed end-to-end (clean county→county join).
-  ③ Aug 4 — MI primary (live test #2): per-county Clarity discovery (county totals); fill the
-     MI 2026 nominees (1-line edit in api/elections.py `candidates`).
-  ④ Aug 11 — WI primary (live test #3): WI at COUNTY-level (no precinct feed exists — fine now).
-  ⑤ Aug → Sep — harden: finish all 8 COUNTY ingestors; wire the live poller as a prod
-     background worker (replaces "Next Batch"); load 2022 Senate (general2028 stub).
-     NOTE: precinct crosswalk (Issue #3) is MOOT under county-level — DROPPED from the path.
-  ⑨ AFTER everything works — OPTIONAL precision upgrade: precinct-level drill-down for GA
-     (Clarity) + NC (dashboard) only. Not required for Nov 3.
-  ⑥ Early–mid Oct: election-ID auto-discovery; test the no-summer-primary states
-     (NV/NC/PA/TX/GA) against archives/specials.
-  ⑦ ~2 wks before (mid–late Oct): capture the real 2026 election IDs (states publish the
-     general at 0%); FULL end-to-end dry run, all 8 × both races; upgrade Render → Starter
-     ($7/mo) + persistent disk; add monitoring (SQLite→Postgres only if very high load).
-  ⑧ Election week → Nov 3: final rehearsal → GO LIVE (poller streams the real feed through
-     the exact same pipeline as the simulator).
-
-  ⟹ Start NOW (county-level v1; AP & the crosswalk are both OFF the table): (1) NC county
-     ingestor · (2) Clarity 403 fix · (3) a 2nd county feed (AZ or MI) to prove the pattern.
-
-  ⚠️ REMAINING-WORK REALITY CHECK: the live feeds DO NOT work yet. Built = the Clarity XML
-  PARSER + the ReplayFeed simulator. NOT built = live Clarity fetch (403) + the per-state
-  COUNTY ingestors + the prod poller. (Precinct crosswalk = MOOT under county-level.)
+  ⚠️ Precinct-level drill-down (GA Clarity + NC dashboard) remains an OPTIONAL future
+  precision upgrade, not required for Nov 3 — county-level is proven sufficient.
 
 ⚠️ Local dev: after ANY change under api/ or ingestor/, restart uvicorn (no --reload) AND click Reset in the UI.
 **To see the dashboard (2 terminals):**

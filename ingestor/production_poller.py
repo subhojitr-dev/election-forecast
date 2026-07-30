@@ -114,7 +114,8 @@ def build_test_tasks() -> list[PollTask]:
                   lambda: sc_live_feed.ingest("126294", "26001", "sc_poller_test_rep")),
         PollTask("MI senate (11/5/2024)", 180,
                   lambda: mi_live_feed.ingest(
-                      mi_live_feed.discover_election_id("11/5/2024"), "senate"),
+                      mi_live_feed.discover_election_id("11/5/2024"), "senate",
+                      db_race_type="mi_poller_test"),
                   enabled=_mi_available()),
     ]
 
@@ -220,7 +221,8 @@ def build_mi_primary_tasks() -> list[PollTask]:
     return [
         PollTask("MI primary (8/4/2026)", 90,
                   lambda: mi_live_feed.ingest(
-                      mi_live_feed.discover_election_id("8/4/2026"), "mi_primary_2026"),
+                      mi_live_feed.discover_election_id("8/4/2026"), "senate",
+                      db_race_type="mi_primary_2026"),
                   enabled=_mi_available()),
     ]
 

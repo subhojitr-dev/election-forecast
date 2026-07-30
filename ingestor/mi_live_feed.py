@@ -164,8 +164,13 @@ def parse_county_totals(zip_bytes, office_code):
     return totals
 
 
-def ingest(election_id, race_type, db_path=DB):
+def ingest(election_id, race_type, db_path=DB, db_race_type=None):
+    """race_type selects the OFFICE (must be a key in OFFICE_CODE: "president"
+    or "senate"). db_race_type is the label written to results_live — defaults
+    to race_type, but pass a scratch value (e.g. "mi_primary_2026") to test
+    against a real office without touching the real tracked race_type's rows."""
     office_code = OFFICE_CODE[race_type]
+    db_race_type = db_race_type or race_type
     zip_bytes = fetch_zip_bytes(election_id)
     totals = parse_county_totals(zip_bytes, office_code)
 
@@ -175,14 +180,14 @@ def ingest(election_id, race_type, db_path=DB):
     totals = {c: v for c, v in totals.items() if c in fips}
 
     conn.execute("DELETE FROM results_live WHERE race_type=? AND precinct_id LIKE 'MI-%'",
-                 (race_type,))
+                 (db_race_type,))
     payload = []
     d_tot = r_tot = 0
     for county, cands in totals.items():
         pid = f"MI-{fips[county]}-CTY"
         ctot = sum(cands.values()) or 1
         for (cand, party), votes in cands.items():
-            payload.append((pid, race_type, cand, party, votes, votes / ctot,
+            payload.append((pid, db_race_type, cand, party, votes, votes / ctot,
                             len(totals), len(fips), "all"))
             if party == "DEM":
                 d_tot += votes
@@ -203,6 +208,7 @@ if __name__ == "__main__":
     import sys
     date_str = sys.argv[1] if len(sys.argv) > 1 else "11/5/2024"
     race = sys.argv[2] if len(sys.argv) > 2 else "president"
+    db_race = sys.argv[3] if len(sys.argv) > 3 else None
     print(f"MI live ingest — discovering electionId for {date_str!r} ...")
     eid = discover_election_id(date_str)
     if eid is None:
@@ -210,8 +216,9 @@ if __name__ == "__main__":
               f"(MI hasn't configured this election in their system yet — retry closer to the night).")
         sys.exit(1)
     print(f"  electionId = {eid}")
-    print(f"Fetching + parsing bulk ZIP -> results_live (race={race}) ...")
-    s = ingest(eid, race)
+    print(f"Fetching + parsing bulk ZIP -> results_live (office={race}, "
+          f"db race_type={db_race or race}) ...")
+    s = ingest(eid, race, db_race_type=db_race)
     tot = s["dem"] + s["rep"] or 1
     print(f"  counties: {s['counties_in']}/{s['counties_total']}   rows: {s['rows']}")
     print(f"  live two-party: D {s['dem']:,} ({100*s['dem']/tot:.1f}%)   "

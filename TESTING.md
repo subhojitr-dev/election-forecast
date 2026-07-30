@@ -326,6 +326,10 @@ python ingestor/az_live_feed.py 68 0 "Governor (REP)" az_primary_test_rep
 
 # MI — first confirm the election id has appeared (may print "NOT FOUND" until it does)
 python ingestor/mi_live_feed.py "8/4/2026" senate
+# once it's found, switch to a 3rd arg so real primary data lands under a SCRATCH
+# db label, not the real tracked "senate" race_type (2nd arg picks the OFFICE —
+# must stay "senate"; 3rd arg is the scratch DB label, can be anything):
+python ingestor/mi_live_feed.py "8/4/2026" senate mi_primary_2026
 ```
 
 **What you should see (PASS), polled repeatedly through the night:**
@@ -333,6 +337,10 @@ python ingestor/mi_live_feed.py "8/4/2026" senate
   vote totals for Governor move (not static).
 - MI: `mi_live_feed.py` eventually stops printing "NOT FOUND" and instead prints a
   discovered electionId, county count, and moving vote totals as the primary reports.
+  Both DEM and REP primary candidates come back in the SAME call (MI's data bundles
+  all candidates for an office with party embedded per-candidate, unlike AZ's separate
+  DEM/REP contest names) — to check the Democratic primary specifically, look at the
+  `dem` total / DEM-party rows within that one pull.
 
 **Clean up afterward** (these are scratch rows, not real data):
 ```powershell

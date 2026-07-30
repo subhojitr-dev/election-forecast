@@ -175,9 +175,11 @@ Adding a state (like SC) needs its OWN small additive loader instead
 (`etl_sc_baseline.py` is the template) — and requires adding `EV`/`STATE_NAMES` entries in
 `api/main.py` too (the states endpoint crashes on a missing EV entry, not just cosmetic).
 
-⚠️ **Production DB is a static release snapshot** (GitHub Release `db-v1`, gzip'd) — local
-changes (SC, all the county-pseudo work) don't reach the live Vercel/Render site until
-someone re-gzips baseline.db and uploads a new release asset (see DEPLOY.md). Not done yet.
+⚠️ **Production DB is a static release snapshot** (GitHub Release **`db-v3`** as of
+2026-07-18, gzip'd) — local DB changes don't reach the live Vercel/Render site until
+someone re-gzips baseline.db and uploads a new release asset + updates `DB_URL` (see
+DEPLOY.md). `db-v3` includes SC, all county-pseudo work, and a fix for a MI/TX/NC
+data-integrity bug (see PROGRESS.md 2026-07-18).
 
 ---
 
@@ -194,15 +196,22 @@ someone re-gzips baseline.db and uploads a new release asset (see DEPLOY.md). No
 
 ## 📅 Phase Status  (see CONTEXT.md for the live snapshot)
 
-  Phases 0–6  ✅ COMPLETE   Planning · ETL · poller · analytics · API/WS · React UI · integration test
-  Phase 7     🔄 IN PROGRESS  Deploy — BACKEND LIVE on Render; frontend (Vercel) PENDING
+  Phases 0–7  ✅ COMPLETE   Planning · ETL · poller · analytics · API/WS · React UI ·
+                            integration test · deploy (frontend + backend both live)
+  Live-readiness  🔄 IN PROGRESS  7/9 states have validated live feeds; production
+                            poller built but OFF; see CONTEXT.md's SCHEDULE table
 
-## 🚀 Deployment (2026-06)
-  Backend (live):  https://election-forecast.onrender.com   (Render Docker, free tier)
-  Frontend:        Vercel — PENDING (Root Directory=ui, env VITE_API_BASE=<render URL>)
+## 🚀 Deployment (updated 2026-07-18)
+  Backend (live):  https://election-forecast.onrender.com   (Render Docker, **Starter
+                   tier + 1GB persistent disk**, upgraded 2026-07-18)
+  Frontend (live): https://election-forecast-silk.vercel.app (Vercel, Root
+                   Directory=ui, env VITE_API_BASE=<render URL>)
   GitHub:          github.com/subhojitr-dev/election-forecast  (data gitignored)
-  DB on host:      baseline.db gzipped (43 MB) as GitHub Release tag db-v1; entrypoint.sh
+  DB on host:      baseline.db gzipped as GitHub Release tag **db-v3**; entrypoint.sh
                    + download_db.py fetch it via DB_URL env var on boot. See DEPLOY.md.
+  Poller:          ingestor/production_poller.py, runs in-process via entrypoint.sh,
+                   gated OFF by ENABLE_POLLER (unset) — plan: on ~Aug 2-3 for MI's Aug 4
+                   primary. See DEPLOY.md's Operating notes.
 
 ## 🗳️ Election manifest (api/elections.py — replaces old SENATE_BASELINE)
   Per-election: which races, which states, baseline year, real nominees. 7 elections:

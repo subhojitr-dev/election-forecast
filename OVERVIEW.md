@@ -2,7 +2,7 @@
 
 A single, current snapshot of the whole project — what's built, what's live, what's
 still ahead. `CONTEXT.md` is denser session-continuity notes for picking work back up;
-this is the "explain it to someone new" version. Last updated 2026-07-17.
+this is the "explain it to someone new" version. Last updated 2026-07-18.
 
 ---
 
@@ -137,64 +137,71 @@ with worked examples and every state's specific gotchas: `TESTING.md` §8.
 
 ---
 
-## 6. Deployment (as-built)
+## 6. Deployment (as-built) — updated 2026-07-18
 
 - **Frontend:** Vercel, auto-deploys on push to `main`.
-- **Backend:** Render Docker web service (free tier), auto-deploys on push. On boot,
-  fetches `baseline.db` (gzipped) from a **GitHub Release** asset via `DB_URL`.
-- **⚠️ Production DB is a static snapshot, not live-synced to your local `baseline.db`.**
-  Everything in §4/§5 (SC, all 7 states' live-feed wiring, every county-pseudo baseline)
-  is **local only** until someone re-gzips `baseline.db` and uploads it as a new Release
-  asset. Not done as of 2026-07-17.
-- **Free-tier caveat:** Render spins down after ~15 min idle → ~30–60s cold start on the
-  first hit after. Fine for a demo; needs the Starter tier + a persistent disk before
-  election night (see §7).
+- **Backend:** Render Docker web service, **Starter tier + 1GB persistent disk**
+  (upgraded 2026-07-18, no more cold starts). Auto-deploys on push. On boot, fetches
+  `baseline.db` (gzipped) from a **GitHub Release** asset via `DB_URL` — current tag
+  **`db-v3`**.
+- **Production DB is now synced and correct.** `db-v3` includes SC, all 7 states'
+  live-feed wiring, every county-pseudo baseline, AND a fix for a real data-integrity
+  bug found 2026-07-18: MI/TX's 2020 Senate baseline had never been converted to
+  county-pseudo, and `results_live` for MI/TX/NC held stale/wrong-election data. Fixed,
+  verified, republished. See `PROGRESS.md`'s 2026-07-18 entry for the full story.
+- **A real production poller exists** (`ingestor/production_poller.py`), deployed inside
+  the same Render web service (launched from `entrypoint.sh`, not a separate worker —
+  Render disks can't be shared across services). **Currently OFF**
+  (`ENABLE_POLLER` unset) — plan is to turn it on ~Aug 2–3 for MI's Aug 4 primary via
+  `POLLER_MODE=mi-primary`. See §7 item 1 and `CONTEXT.md`'s MI runbook.
+- **MI's headed-browser requirement now works on Render too** — Dockerfile installs
+  Xvfb + Playwright/Chromium, confirmed building successfully.
 
 Full steps + gotchas: `DEPLOY.md`.
 
 ---
 
-## 7. What's NOT built yet — the roadmap
+## 7. What's NOT built yet — the roadmap — updated 2026-07-18
 
-Roughly in the order it needs to happen:
+Roughly in the order it needs to happen (dates also tracked in `CONTEXT.md`'s
+"SCHEDULE" table):
 
-1. **AZ (Jul 21) and MI (Aug 4) primary-night validation.** Code is done; what's left can
-   only happen on the actual nights — confirm the polling mechanics work against real,
-   currently-reporting data. Runbook: `CONTEXT.md`.
-2. **South Carolina** (SC): its `general2026` electionId isn't published yet
-   (`enr-scvotes.org/SC/elections.json` is empty between elections) — needs a check
-   closer to the date, same situation as MI.
-3. **Production DB republish** — everything built this session is local-only (§6). A
-   one-time re-gzip + upload before it matters for real usage.
-4. **A real production poller.** Right now each `*_live_feed.py` is a manual one-off
-   script. Election night needs these wrapped in a scheduler (a loop hitting each
-   state's `ingest(...)` every ~60s) running as a background worker. **MI is the
-   complication**: it needs a headed browser, which needs a virtual display (Xvfb) added
-   to a Linux host — technically standard (the pattern many CI systems use), but not yet
-   built or tested in this project. The other 6 wired states (plain httpx or headless
-   Playwright) have no such requirement and could run in a normal serverless/background
-   worker today.
+1. **~Aug 2–3, 2026 — turn the production poller on for MI.** Render → Environment tab →
+   `ENABLE_POLLER=1` + `POLLER_MODE=mi-primary`. Verify (via Render's Logs tab) it finds
+   MI's Aug 4 electionId before the night itself. The poller and MI's Xvfb-backed headed
+   browser are both already built and deployed — this step is flipping the switch, not
+   building anything new.
+2. **Aug 4, 2026 — MI primary, live validation.** After: replace the "TBD AUG 4"
+   candidate placeholders in `api/elections.py` with MI's real nominees (code push).
+3. **Jul 21, 2026 — AZ primary.** Pure mechanics smoke test (AZ isn't in `general2026`).
+   If this doc is being read after Jul 21, check `PROGRESS.md` for whether/how it went.
+4. **Aug 11, 2026 — WI primary**, only if there's spare runway (optional — WI isn't in
+   `general2026` either, and has no live feed built yet).
 5. **Election-ID discovery for the real Nov 2026 general**, per state, ~2 weeks before
-   (mid–late Oct), once each state publishes its 0%-reporting page. AZ's ID is stable
-   and already known; MI/TX auto-discover; GA/SC need a manual check.
-6. **A full dry run** — all wired states × their real Nov 2026 races, against each
-   state's live (empty) general-election feed, before the actual night.
-7. **Render infra upgrade** — Starter tier + persistent disk, so the DB survives across
-   requests during election night instead of re-downloading on every cold start.
-8. **Texas, Nevada, Wisconsin, and South Carolina — whichever are still open closer to
-   Nov 2028** (President + a different set of Senate classes) — not required for Nov
-   2026 but useful to have ahead of time:
+   (mid–late Oct), once each state publishes its 0%-reporting page. MI/TX auto-discover;
+   GA/NC/SC need a manual electionId lookup (see `FEED_AUDIT.md`). Filling these into
+   `production_poller.py`'s `build_production_tasks()` is mechanical, not new
+   engineering — the `_tbd()` placeholders are already wired in.
+6. **A full dry run** — all 5 tracked states × their real Nov 2026 senate race, against
+   each state's live (empty) general-election feed, before the actual night.
+7. **Texas, Nevada, Wisconsin — whichever are still open closer to Nov 2028** (President
+   + a different set of Senate classes) — not required for Nov 2026 but useful ahead of
+   time:
    - **NV and WI**, deprioritized for 2026, become live again for `general2028` (both
      have Senate seats up then). WI in particular needs real scoping work first — see
      the WI note in `CONTEXT.md` / `Issues.md` before committing to an approach (likely
      a subset of big counties, not full 72-county coverage).
    - **2022 Senate baseline** needs loading (`general2028` stub currently has no data)
      — the raw file is already on disk.
-9. **Precinct-level drill-down (optional precision upgrade, explicitly NOT required).**
+8. **Precinct-level drill-down (optional precision upgrade, explicitly NOT required).**
    The whole project runs at county granularity by design (a 2026-06-30 decision — county
    FIPS is a clean, stable join; no name-matching/crosswalk needed). If ever revisited for
    extra precision, GA (via Clarity) and NC (via its own dashboard) are the two states
    flagged as easy candidates — everyone else stays county-level permanently.
+
+**Already done, no longer on this list:** production DB republish (`db-v3`), the
+production poller itself, Render's Starter+disk upgrade, and MI's Xvfb/Docker setup —
+all built and deployed 2026-07-18 (see §6 above).
 
 ---
 
