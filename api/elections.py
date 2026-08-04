@@ -18,8 +18,9 @@ announced (that's the only part not knowable far ahead).
 from __future__ import annotations
 
 ALL8 = ["GA", "PA", "AZ", "NV", "WI", "MI", "NC", "TX"]
-RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special"}
-RACE_ORDER = ["president", "senate", "senate_special"]
+RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special",
+              "mi_primary_2026": "MI Primary (leading D vs leading R)"}
+RACE_ORDER = ["president", "senate", "senate_special", "mi_primary_2026"]
 
 ELECTIONS = {
     "demo": {
@@ -74,6 +75,22 @@ ELECTIONS = {
             # Graham (R, incumbent) 56.78%/264,091 beat Mark Lynch; Andrews (D) 61.53%/226,075.
             "SC": {"dem": "ANNIE ANDREWS", "rep": "LINDSEY GRAHAM"},
         }},
+    },
+    # --- LIVE TEST, 2026-08-04: watch tonight's real MI primary on the dashboard.
+    # Uses the scratch race_type production_poller.py already writes to
+    # (db_race_type="mi_primary_2026"), so this can be added/removed freely without
+    # ever touching the real general2026 senate tracking. No baseline is set —
+    # baseline_year() falls through to its default and _load_baseline() finds no
+    # matching results_historical rows, which the engine handles gracefully (shows
+    # as "no baseline"/flat swing). That's expected for a primary: only the live
+    # vote totals + leading D/R candidate names are meaningful here, not the
+    # swing/win-probability panels (those need a real prior election to compare to).
+    # Safe to delete this whole entry (and the RACE_LABEL/RACE_ORDER lines above)
+    # once the primary's over.
+    "mi_primary_2026_test": {
+        "label": "LIVE TEST · MI Primary — Aug 4, 2026",
+        "date": "2026-08-04",
+        "races": {"mi_primary_2026": ["MI"]},
     },
     "general2028": {
         "label": "General · Nov 7, 2028 (needs 2022 Senate data)",
