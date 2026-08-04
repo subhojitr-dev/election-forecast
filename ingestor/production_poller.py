@@ -217,12 +217,17 @@ def run(tasks: list[PollTask], once: bool):
 # Delete `WHERE race_type='mi_primary_2026'` afterward if you want it gone;
 # harmless to leave, since no election manifest ever references that name.
 # ---------------------------------------------------------------------------
+def _mi_primary_poll():
+    eid = mi_live_feed.discover_election_id("8/4/2026")
+    if eid is None:
+        log("  MI primary (8/4/2026): not yet configured by MI — still searching")
+        return None
+    return mi_live_feed.ingest(eid, "senate", db_race_type="mi_primary_2026")
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
     return [
-        PollTask("MI primary (8/4/2026)", 90,
-                  lambda: mi_live_feed.ingest(
-                      mi_live_feed.discover_election_id("8/4/2026"), "senate",
-                      db_race_type="mi_primary_2026"),
+        PollTask("MI primary (8/4/2026)", 90, _mi_primary_poll,
                   enabled=_mi_available()),
     ]
 
