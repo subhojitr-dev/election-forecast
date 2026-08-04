@@ -19,7 +19,7 @@ from __future__ import annotations
 
 ALL8 = ["GA", "PA", "AZ", "NV", "WI", "MI", "NC", "TX"]
 RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special",
-              "mi_primary_2026": "MI Primary (leading D vs leading R)"}
+              "mi_primary_2026": "MI Primary — Dem field vs GOP field"}
 RACE_ORDER = ["president", "senate", "senate_special", "mi_primary_2026"]
 
 ELECTIONS = {
