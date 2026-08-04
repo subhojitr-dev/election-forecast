@@ -87,9 +87,7 @@ header.topbar .dot { color: #2ec27e; }
 .votebar .totals { display: flex; justify-content: space-between; margin-top: 6px; color: var(--muted); font-size: 13px; }
 .big { font-size: 22px; font-weight: 700; }
 
-/* ---- primary leaderboard (two separate intra-party contests) ---- */
-.primary-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.primary-col h3 { font-size: 13px; margin: 0 0 8px; }
+/* ---- primary leaderboard ---- */
 .primary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .primary-list li { display: flex; justify-content: space-between; align-items: baseline;
   background: var(--panel-2); border-radius: 6px; padding: 6px 10px; font-size: 13px; }

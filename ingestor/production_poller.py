@@ -222,7 +222,11 @@ def _mi_primary_poll():
     if eid is None:
         log("  MI primary (8/4/2026): not yet configured by MI — still searching")
         return None
-    return mi_live_feed.ingest(eid, "senate", db_race_type="mi_primary_2026")
+    # Only the Democratic primary is watched tonight — the GOP side isn't a
+    # real contest, so its rows are dropped in ingest() itself (parties={"DEM"}),
+    # not just hidden in the UI. See mi_live_feed.ingest()'s parties param.
+    return mi_live_feed.ingest(eid, "senate", db_race_type="mi_primary_2026",
+                                parties={"DEM"})
 
 
 def build_mi_primary_tasks() -> list[PollTask]:

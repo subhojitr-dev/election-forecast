@@ -164,15 +164,24 @@ def parse_county_totals(zip_bytes, office_code):
     return totals
 
 
-def ingest(election_id, race_type, db_path=DB, db_race_type=None):
+def ingest(election_id, race_type, db_path=DB, db_race_type=None, parties=None):
     """race_type selects the OFFICE (must be a key in OFFICE_CODE: "president"
     or "senate"). db_race_type is the label written to results_live — defaults
     to race_type, but pass a scratch value (e.g. "mi_primary_2026") to test
-    against a real office without touching the real tracked race_type's rows."""
+    against a real office without touching the real tracked race_type's rows.
+    parties: optional set of party codes to keep (e.g. {"DEM"}) — candidates
+    from any other party are dropped before any DB write, so their rows never
+    land in results_live at all (not just hidden in the UI). Use this to scope
+    a poll to a single party's primary, e.g. when the other side's primary
+    isn't competitive/relevant and there's no reason to store it."""
     office_code = OFFICE_CODE[race_type]
     db_race_type = db_race_type or race_type
     zip_bytes = fetch_zip_bytes(election_id)
     totals = parse_county_totals(zip_bytes, office_code)
+    if parties:
+        totals = {county: {k: v for k, v in cands.items() if k[1] in parties}
+                  for county, cands in totals.items()}
+        totals = {county: cands for county, cands in totals.items() if cands}
 
     conn = sqlite3.connect(db_path)
     fips = {_norm_county(r[0]): r[1] for r in conn.execute(
