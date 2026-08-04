@@ -264,6 +264,42 @@ def state_detail(abbr: str, response: Response, race: str = Query("president"),
     return b
 
 
+@app.get("/api/state/{abbr}/candidates")
+def state_candidates(abbr: str, response: Response, race: str = Query("president")):
+    """Full candidate field, grouped by party, each sorted by votes descending.
+
+    For a PRIMARY, this is what actually matters — the D-vs-R framing everywhere
+    else in the app (compute_state_analytics' dem_candidate/rep_candidate) only
+    ever surfaces the single leading candidate per party, which reads as if the
+    top Democrat and top Republican are running against each other. They aren't:
+    a primary is two separate intra-party contests. This endpoint exposes the
+    full per-party field so the UI can show each party's real standings.
+    """
+    response.headers["Cache-Control"] = READ_CACHE
+    abbr = abbr.upper()
+    if abbr not in STATES:
+        raise HTTPException(404, f"Unknown state {abbr}")
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT party, candidate, SUM(votes) AS votes
+               FROM results_live
+               WHERE race_type=? AND precinct_id LIKE ?
+               GROUP BY party, candidate
+               ORDER BY party, votes DESC""",
+            (race, f"{abbr}-%")).fetchall()
+    finally:
+        conn.close()
+    by_party: dict[str, list[dict]] = {}
+    for r in rows:
+        by_party.setdefault(r["party"], []).append({"candidate": r["candidate"], "votes": r["votes"]})
+    for cands in by_party.values():
+        total = sum(c["votes"] for c in cands) or 1
+        for c in cands:
+            c["share"] = c["votes"] / total
+    return {"state": abbr, "race_type": race, "by_party": by_party}
+
+
 @app.get("/api/state/{abbr}/series")
 def state_series(abbr: str, race: str = Query("president")):
     """Panel 5 convergence time-series only (lighter payload)."""

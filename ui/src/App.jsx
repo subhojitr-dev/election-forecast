@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getElections, getStates, getStateDetail, getScenarios, simReset, simNext, simStatus } from './api'
+import { getElections, getStates, getStateDetail, getCandidates, getScenarios, simReset, simNext, simStatus } from './api'
 import SwingStateStrip from './components/SwingStateStrip'
 import RaceToggle from './components/RaceToggle'
 import SimControls from './components/SimControls'
@@ -11,6 +11,11 @@ import CountyTable from './components/CountyTable'
 import WatchList from './components/WatchList'
 import EVTracker from './components/EVTracker'
 import CountyInsight from './components/CountyInsight'
+import PrimaryLeaderboard from './components/PrimaryLeaderboard'
+
+// Races that are an actual primary (intra-party contest), not a D-vs-R general —
+// these get the PrimaryLeaderboard instead of/alongside the head-to-head panels.
+const PRIMARY_RACES = new Set(['mi_primary_2026'])
 
 const POLL_MS = 10000
 
@@ -22,6 +27,7 @@ export default function App() {
   const [selected, setSelected] = useState('GA')
   const [selectedCounty, setSelectedCounty] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [candidates, setCandidates] = useState(null)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -51,12 +57,15 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!race) return
     try {
-      const [sd, det] = await Promise.all([
+      const isPrimary = PRIMARY_RACES.has(race)
+      const [sd, det, cand] = await Promise.all([
         getStates(race, election),
         getStateDetail(selected, race, election),
+        isPrimary ? getCandidates(selected, race) : Promise.resolve(null),
       ])
       setStatesData(sd)
       setDetail(det)
+      setCandidates(cand)
       setError(null)
     } catch (e) {
       setError(e.message || 'Request failed')
@@ -160,10 +169,14 @@ export default function App() {
             )}
           </div>
 
-          <div className="row2">
-            <LiveVoteBar detail={detail} />
-            <WinProbGauge detail={detail} />
-          </div>
+          {PRIMARY_RACES.has(race) ? (
+            <PrimaryLeaderboard candidates={candidates} />
+          ) : (
+            <div className="row2">
+              <LiveVoteBar detail={detail} />
+              <WinProbGauge detail={detail} />
+            </div>
+          )}
 
           <ConvergenceChart detail={detail} />
           <CountyShiftBars detail={detail} />

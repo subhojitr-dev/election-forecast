@@ -21,6 +21,12 @@ export async function getStateDetail(abbr, race, election) {
   return r.json()
 }
 
+export async function getCandidates(abbr, race) {
+  const r = await fetch(`${API}/api/state/${abbr}/candidates?race=${race}`)
+  if (!r.ok) throw new Error(`Failed to load candidates for ${abbr}`)
+  return r.json()
+}
+
 export async function getCountyDetail(abbr, county, race, election) {
   const r = await fetch(`${API}/api/state/${abbr}/county/${encodeURIComponent(county)}?race=${race}&election=${election}`)
   if (!r.ok) throw new Error(`Failed to load ${county}`)
