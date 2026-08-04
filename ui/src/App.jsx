@@ -63,6 +63,16 @@ export default function App() {
     }
   }, [race, selected, election])
 
+  // safety net: if `selected` isn't actually on the ballot for this race (e.g. GA
+  // isn't a state in a single-state race like MI's primary), snap to the first
+  // state that is, instead of silently fetching/displaying the wrong state's data.
+  useEffect(() => {
+    if (!statesData?.states?.length) return
+    if (!statesData.states.some((s) => s.state === selected)) {
+      setSelected(statesData.states[0].state)
+    }
+  }, [statesData, selected])
+
   // load scenarios + current sim status when the race or election changes
   useEffect(() => {
     if (!race) return
