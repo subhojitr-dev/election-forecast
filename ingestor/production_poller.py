@@ -57,7 +57,7 @@ import ga_live_feed
 import mi_clarity_feed
 import mi_enhancedvoting_feed
 import mi_live_feed
-import mi_livingston_feed
+import mi_pdf_feed
 import mi_totalvote_feed
 import mi_washtenaw_feed
 import nc_live_feed
@@ -258,12 +258,23 @@ MI_ENHANCEDVOTING_COUNTIES = [
     ("ingham-county-mi", "AugustElection08042026", "26065", "INGHAM"),
     ("kalamazoo-county-mi", "August-2026-Primary-Election", "26077", "KALAMAZOO"),
     ("saginaw-county-mi", "SaginawCountyAugust2026Primary", "26145", "SAGINAW"),
+    ("berrien-county-mi", "2026Augustelection", "26021", "BERRIEN"),
+    ("monroe-county-mi", "August2026Election", "26115", "MONROE"),
 ]
 MI_CLARITY_COUNTIES = [
     ("https://results.enr.clarityelections.com/MI/Macomb", "126774", "26099", "MACOMB"),
     ("https://results.enr.clarityelections.com/MI/OaklandMI", "127075", "26125", "OAKLAND"),
     ("https://results.enr.clarityelections.com/MI/Genesee", "126773", "26049", "GENESEE"),
     ("https://www.miottawavotes.gov/MI/Ottawa", "126772", "26139", "OTTAWA"),
+]
+# Periodically-regenerated PDF reports -- a common county-clerk report
+# template (mi_pdf_feed.py generalizes across different voting-method column
+# counts). (pdf_url, county_fips, county_name).
+MI_PDF_COUNTIES = [
+    ("https://milivcounty.gov/wp-content/uploads/All-Candidate-and-Proposal-Report-8-4-2026.pdf",
+     "26093", "LIVINGSTON"),
+    ("https://co.muskegon.mi.us/DocumentCenter/View/21923/2026-08-04_Cumulative_Results",
+     "26121", "MUSKEGON"),
 ]
 
 
@@ -305,12 +316,14 @@ def _mi_washtenaw_poll():
         return None
 
 
-def _mi_livingston_poll():
-    try:
-        return mi_livingston_feed.ingest()
-    except Exception as e:
-        log(f"    Livingston: FAILED — {type(e).__name__}: {e}")
-        return None
+def _mi_pdf_poll():
+    results = []
+    for pdf_url, fips, name in MI_PDF_COUNTIES:
+        try:
+            results.append(mi_pdf_feed.ingest(pdf_url, fips, name))
+        except Exception as e:
+            log(f"    PDF {name}: FAILED — {type(e).__name__}: {e}")
+    return {"counties": [r["county"] for r in results]} if results else None
 
 
 def build_mi_primary_tasks() -> list[PollTask]:
@@ -329,7 +342,7 @@ def build_mi_primary_tasks() -> list[PollTask]:
         PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
         PollTask("MI primary — Clarity counties", 90, _mi_clarity_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
-        PollTask("MI primary — Livingston", 90, _mi_livingston_poll),
+        PollTask("MI primary — PDF counties", 90, _mi_pdf_poll),
     ]
 
 
