@@ -56,6 +56,7 @@ import az_live_feed
 import ga_live_feed
 import mi_enhancedvoting_feed
 import mi_live_feed
+import mi_livingston_feed
 import mi_totalvote_feed
 import mi_washtenaw_feed
 import nc_live_feed
@@ -278,6 +279,14 @@ def _mi_washtenaw_poll():
         return None
 
 
+def _mi_livingston_poll():
+    try:
+        return mi_livingston_feed.ingest()
+    except Exception as e:
+        log(f"    Livingston: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
     return [
         PollTask("MI primary (8/4/2026)", 90, _mi_primary_poll,
@@ -285,6 +294,7 @@ def build_mi_primary_tasks() -> list[PollTask]:
         PollTask("MI primary — TotalVote counties", 90, _mi_totalvote_poll),
         PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
+        PollTask("MI primary — Livingston", 90, _mi_livingston_poll),
     ]
 
 
