@@ -54,6 +54,7 @@ sys.path.insert(0, HERE)
 
 import az_live_feed
 import ga_live_feed
+import mi_clarity_feed
 import mi_enhancedvoting_feed
 import mi_live_feed
 import mi_livingston_feed
@@ -240,19 +241,29 @@ def _mi_primary_poll():
 
 # Individual MI counties confirmed to run their own live results system,
 # split by vendor since each needs different ingest() args. Discovered
-# 2026-08-04 -- MI's state system doesn't show a county until it's 100% done
+# 2026-08-04/05 -- MI's state system doesn't show a county until it's 100% done
 # (see mi_live_feed.py's docstring), so these county-level sources are what
-# actually gives real partial progress tonight. Not every county is on one
-# of these three vendors (Oakland/Macomb/Genesee run Clarity but hadn't
-# activated tonight's election as of this writing) -- add more tuples below
-# as more counties are found. Each writes to its OWN precinct_id row, so
-# partial coverage is honest, not misleading -- a county has no row until
-# it's added here.
+# actually gives real progress. Oakland/Macomb/Genesee were briefly thought
+# "not activated" on Aug 4 night -- wrong, that was stale electionIds from a
+# web search; going straight to each county's own page found the correct URLs
+# (see mi_clarity_feed.py). 11 counties confirmed as of 2026-08-05, ~70-75%
+# of the statewide vote (see PROGRESS.md). Each writes to its OWN precinct_id
+# row, so partial coverage (more counties can be added later) is honest, not
+# misleading -- a county has no row until it's added here.
 MI_TOTALVOTE_COUNTIES = [
     ("Wayne", "05", "26163", "WAYNE"),
 ]
 MI_ENHANCEDVOTING_COUNTIES = [
     ("kent-county-mi", "08042026", "26081", "KENT"),
+    ("ingham-county-mi", "AugustElection08042026", "26065", "INGHAM"),
+    ("kalamazoo-county-mi", "August-2026-Primary-Election", "26077", "KALAMAZOO"),
+    ("saginaw-county-mi", "SaginawCountyAugust2026Primary", "26145", "SAGINAW"),
+]
+MI_CLARITY_COUNTIES = [
+    ("https://results.enr.clarityelections.com/MI/Macomb", "126774", "26099", "MACOMB"),
+    ("https://results.enr.clarityelections.com/MI/OaklandMI", "127075", "26125", "OAKLAND"),
+    ("https://results.enr.clarityelections.com/MI/Genesee", "126773", "26049", "GENESEE"),
+    ("https://www.miottawavotes.gov/MI/Ottawa", "126772", "26139", "OTTAWA"),
 ]
 
 
@@ -273,6 +284,16 @@ def _mi_enhancedvoting_poll():
             results.append(mi_enhancedvoting_feed.ingest(slug, eid, fips, name))
         except Exception as e:
             log(f"    EnhancedVoting {name}: FAILED — {type(e).__name__}: {e}")
+    return {"counties": [r["county"] for r in results]} if results else None
+
+
+def _mi_clarity_poll():
+    results = []
+    for base_url, eid, fips, name in MI_CLARITY_COUNTIES:
+        try:
+            results.append(mi_clarity_feed.ingest(base_url, eid, fips, name))
+        except Exception as e:
+            log(f"    Clarity {name}: FAILED — {type(e).__name__}: {e}")
     return {"counties": [r["county"] for r in results]} if results else None
 
 
@@ -306,6 +327,7 @@ def build_mi_primary_tasks() -> list[PollTask]:
                   enabled=False),
         PollTask("MI primary — TotalVote counties", 90, _mi_totalvote_poll),
         PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
+        PollTask("MI primary — Clarity counties", 90, _mi_clarity_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
         PollTask("MI primary — Livingston", 90, _mi_livingston_poll),
     ]

@@ -16,13 +16,24 @@ point in the night).
 No robots.txt restriction found. Same category as every other state ENR
 system this project uses -- the county's own official public results page.
 
-API pattern (confirmed working for Kent):
+API pattern (confirmed working for Kent, Ingham, Ottawa's neighbor Kalamazoo, and
+Saginaw):
     https://app.enhancedvoting.com/results/public/api/elections/{slug}/{election_id}/data
-    slug example: "kent-county-mi"   election_id example: "08042026"
-Guessed slugs for Oakland/Macomb/Genesee/Washtenaw/Ingham/Ottawa all 204'd
-(endpoint exists, no data) — those counties are NOT on EnhancedVoting, this
-isn't a slug-guessing problem. Add more (slug, name) tuples below only once
-confirmed working, the same way Kent was.
+    slug example: "kent-county-mi"   election_id varies per county —
+    "08042026" (Kent), "AugustElection08042026" (Ingham),
+    "August-2026-Primary-Election" (Kalamazoo), "SaginawCountyAugust2026Primary"
+    (Saginaw) — each county names its own election id, not guessable, discover
+    via that county's own official elections page.
+Guessed slugs for Oakland/Macomb/Genesee/Washtenaw/Ottawa all 204'd (endpoint
+exists, no data) — those counties are NOT on EnhancedVoting (Oakland/Macomb/
+Genesee/Ottawa turned out to be Clarity instead, see mi_clarity_feed.py).
+
+**Contest name varies by county even on this one platform** (found 2026-08-05):
+Kent uses "United States Senator (DEM)"; Kalamazoo and Ingham use
+"DEM United States Senator" (party prefix, no parens) for the exact same
+contest. Matched below via substring check (contains "senator" and "dem",
+case-insensitive), not an exact string — add more counties without worrying
+about their exact naming convention.
 
 Usage:
     python ingestor/mi_enhancedvoting_feed.py kent-county-mi 08042026 26081 KENT
@@ -38,7 +49,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(os.path.dirname(HERE), "data", "db", "baseline.db")
 BASE = "https://app.enhancedvoting.com/results/public/api/elections"
 
-CONTEST_NAME = "United States Senator (DEM)"
+
+def _is_senate_dem_contest(name: str) -> bool:
+    n = name.lower()
+    return "senator" in n and "dem" in n
 
 
 def fetch_senate_dem(slug: str, election_id: str):
@@ -52,7 +66,7 @@ def fetch_senate_dem(slug: str, election_id: str):
 
     for item in data.get("ballotItems", []):
         name = item["name"][0]["text"] if item.get("name") else ""
-        if name != CONTEST_NAME:
+        if not _is_senate_dem_contest(name):
             continue
         rs = item.get("reportingStatus") or {}
         reporting = rs.get("reportingUnits", 0)
@@ -60,7 +74,10 @@ def fetch_senate_dem(slug: str, election_id: str):
         candidates = []
         for opt in item.get("summaryResults", {}).get("ballotOptions", []):
             cand_name = opt["name"][0]["text"] if opt.get("name") else ""
-            if opt.get("isWriteIn"):
+            # isWriteIn isn't reliable across counties (Kalamazoo's write-in
+            # row is flagged isWriteIn=False, found 2026-08-05) — also check
+            # the candidate name itself as a backstop.
+            if opt.get("isWriteIn") or cand_name.strip().lower() == "write-in":
                 continue
             candidates.append((cand_name, opt.get("voteCount", 0)))
         return candidates, reporting, total
