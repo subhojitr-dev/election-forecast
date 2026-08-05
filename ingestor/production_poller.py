@@ -167,8 +167,13 @@ def _mi_available() -> bool:
 
 
 def start_xvfb_if_needed(tasks: list[PollTask]):
+    """Only the headed-Chromium MI state-system task needs a virtual display —
+    the county-level MI tasks (TotalVote/EnhancedVoting/Washtenaw/Livingston)
+    are all plain HTTP, no browser at all. Match on that specific task name,
+    not a generic "MI" prefix, so Xvfb doesn't start for nothing when that
+    task is disabled (as it is as of 2026-08-05 — see build_mi_primary_tasks())."""
     global _xvfb_started
-    if _xvfb_started or not any(t.name.startswith("MI") and t.enabled for t in tasks):
+    if _xvfb_started or not any(t.name == "MI primary (8/4/2026)" and t.enabled for t in tasks):
         return
     if not _mi_available():
         log("MI task present but Xvfb unavailable on this host (need Linux) — MI stays disabled.")
@@ -289,8 +294,16 @@ def _mi_livingston_poll():
 
 def build_mi_primary_tasks() -> list[PollTask]:
     return [
+        # DISABLED 2026-08-05: confirmed dead (0-byte results file, 11+ hrs
+        # post-close — see PROGRESS.md 2026-08-05) AND very likely the cause of
+        # a Render memory-limit restart the same morning. Once MI's electionId
+        # appeared (706), this task stopped short-circuiting on "not found" and
+        # started launching TWO full headed-Chromium browsers every 90s
+        # (discover_election_id + fetch_zip_bytes inside ingest()), continuously,
+        # only to hit an empty file and throw every time. Zero value, real cost —
+        # leave disabled. The county-level tasks below are the real MI signal.
         PollTask("MI primary (8/4/2026)", 90, _mi_primary_poll,
-                  enabled=_mi_available()),
+                  enabled=False),
         PollTask("MI primary — TotalVote counties", 90, _mi_totalvote_poll),
         PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
