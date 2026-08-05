@@ -1,71 +1,123 @@
-We're continuing the Election Forecast Dashboard (C:\Users\subho\election-forecast), a
-Nov 3, 2026 election-night forecasting tool. Read CONTEXT.md first — its "SCHEDULE"
-table near the top and "Deployment facts" section have the current state — then
-NEXT_SESSION_PROMPT.md. Full story of the most recent work session is in PROGRESS.md's
-2026-07-18 entry.
+We're continuing the Election Forecast Dashboard (C:\Users\subho\election-forecast),
+prepping for the real Nov 3, 2026 general election. Read CONTEXT.md first (its
+SCHEDULE table and the MI runbook section have the current state), then
+FEED_AUDIT.md's "Round 2 - LIVE CADENCE" section (the state-by-state readiness
+evidence this whole plan is built on), then this prompt. Full story of the Aug 4
+MI primary night is in PROGRESS.md's 2026-08-04 and 2026-08-05 entries.
 
-Where we are (as of 2026-07-18): 9 states of data, 7 with live feeds validated to exact
-certified results — GA, NC, PA, AZ, MI, TX, SC all have working *_live_feed.py scripts
-proven to match certified historical results exactly (see TESTING.md §8). Only WI and NV
-lack a live feed — NV doesn't matter (no 2026 race at all); WI is low-priority (no
-statewide feed, 72 county clerk sites, not in general2026's tracked senate list either).
+Where we are (as of 2026-08-05): The core finding from Aug 4 is that a state's
+live feed mechanism working and matching certified historical results (what all
+5 tracked states had before Aug 4) is a different, weaker claim than "delivers
+usable data during a real live count." MI had a "strong (mechanism)" rating
+right up until election night proved its actual state system
+(mvic.sos.state.mi.us/votehistory) doesn't publish live data at all -
+confirmed twice: nothing 3 hours post-close, still nothing (0-byte results
+file) 11 hours post-close the next morning. This is the central risk for
+Nov 3: any of GA/NC/TX/SC could have the same gap, and we won't know until
+tested against a real count.
 
-Production is deployed and live: Vercel (frontend) + Render (backend), now on Starter
-tier with a 1GB persistent disk, DB republished as GitHub Release db-v3 (fixed a real
-data-integrity bug found this session — MI/TX's 2020 Senate baseline had never been
-converted to county-pseudo, and results_live for MI/TX/NC held stale/wrong data).
+What was done about it Aug 4, live, under pressure: found and wired up 4
+individual Michigan county results systems (Wayne/TotalVote,
+Kent/EnhancedVoting, Washtenaw/custom HTML, Livingston/PDF) as a real-time
+fallback - genuinely working, genuinely deployed, but explicitly flagged by
+the user as not a sustainable pattern - one-off scraper per county doesn't
+scale to covering enough of MI, let alone repeating for another state if TX
+turns out to have the same problem.
 
-A production poller now exists (ingestor/production_poller.py) — a real scheduler that
-wraps every state's ingest() call on its own interval, deployed inside the Render web
-service (launched from entrypoint.sh, gated by ENABLE_POLLER/POLLER_MODE env vars). It
-is currently OFF in production — deliberately, to avoid pointless polling before MI's
-Aug 4 primary even has a live electionId. Dockerfile now has Xvfb + Playwright/Chromium
-baked in, so MI's headed-browser requirement works on Render too (confirmed working).
+Retrospective research done the morning after (not live-tested, but real
+evidence from each state's own most recent actual primary): NC (Mar 3, 2026)
+and GA (May 19, 2026) both have good evidence of same-night, real-time
+reporting. TX (Mar 3, 2026) had a real, documented mess - hand-count delays
+past midnight in some counties, big counties (Harris/Dallas/Tarrant)
+acknowledged as slow - moderate, bounded risk, not MI-bad, but real. SC and AZ
+remain the only states with firsthand proof (both directly tested live).
 
-The concrete near-term plan, in order:
-  1. Jul 21, 2026 — AZ primary. Pure mechanics smoke test, no manifest change needed (AZ
-     isn't tracked by general2026, only general2028 eventually).
-  2. ~Aug 2-3, 2026 — turn the poller on. Render -> service -> Environment tab -> set
-     ENABLE_POLLER=1 and POLLER_MODE=mi-primary -> save (auto-redeploys). Runs
-     build_mi_primary_tasks(): polls MI's Aug 4 primary every 90s, auto-discovering the
-     electionId from "8/4/2026", writing under scratch race_type mi_primary_2026 (never
-     the real senate race_type — that would corrupt the just-fixed Nov 2026 tracking
-     data). Verify in Render's Logs tab that it actually finds the election BEFORE
-     Aug 4 itself.
-  3. Aug 4, 2026 — MI primary, live. Watch it run for real. Afterward: set
-     ENABLE_POLLER=0 again, and replace the "TBD AUG 4" candidate placeholders in
-     api/elections.py's general2026 manifest with MI's actual nominees (small code push,
-     not a DB change).
-  4. Decide about the Starter subscription after Aug 4 — fine to let it ride, or pause
-     and resume before the October dry run (prorating a few days doesn't matter).
-  5. Aug 11, 2026 — WI primary, if there's spare runway (optional, not gating Nov 3).
-  6. Mid-late Oct, 2026 — the real unlock: GA/MI/NC/TX/SC publish their actual Nov 3
-     general-election IDs. Fill these into production_poller.py's
-     build_production_tasks() (currently _tbd() placeholders) — mechanical, not new
-     engineering.
-  7. ~2 weeks before Nov 3 — full end-to-end dry run against the real 0%-reporting
-     general pages, all 5 tracked states.
-  8. Election week -> Nov 3 — final rehearsal, then ENABLE_POLLER=1 / POLLER_MODE=prod
-     for the real thing.
+The Nov 3 readiness plan, in order:
 
-Gotchas (still true, carried forward): baseline.db is gitignored — production only picks
-up local DB changes when you re-gzip + re-upload as a new GitHub Release and update
-Render's DB_URL env var (current tag: db-v3). Never run
-python ingestor/etl_baseline.py to add a state or year — it drops and rebuilds the whole
-DB from 5 hardcoded sources, destroying every live-feed county-pseudo baseline built
-since (SC's loader, etl_sc_baseline.py, is additive on purpose). /api/states reads a
-pre-computed cache (live_snapshots) that only refreshes when empty for a state+race — if
-numbers look stale after writing new results_live rows, clear the relevant snapshot rows
-rather than assuming the write failed. Always use a scratch race_type (not a real
-tracked one like senate) for any primary-night mechanics test or early live-fire test —
-this is exactly the MI/TX/NC bug fixed this session. MI needs a headed browser (works
-locally on any machine with a real display, and now also on Render via Xvfb); TX only
-needs headless; everything else (NC/GA/PA/AZ/SC) is plain httpx. Clarity is dead
-everywhere checked except SC (still genuinely alive there) — verify per state, don't
-assume. API runs without --reload: restart uvicorn + click Reset in the UI after any
-api/ingestor code change.
+1. First (cheap, do immediately): re-check mielections.us. This is a separate
+   official MI domain from votehistory, found via michigan.gov's own link -
+   unreachable from multiple independent connections during Aug 4's peak
+   traffic (likely overload, not a dead end). If it's actually a fast,
+   unified statewide MI portal once traffic is normal, it could replace most
+   of the county-by-county work below. One check settles this - do it before
+   investing further in MI county work.
 
-Longer-term / not urgent: WI and NV live feeds (general2028 prep only); precinct-level
-drill-down for GA/NC (optional precision upgrade, not required for Nov 3); general2028
-needs 2022 Senate data loaded (already on disk at
-data/raw/2022-SENATE-precinct-general.csv, just not loaded into the DB yet).
+2. Turn MI's "4 one-off scrapers" into a smaller set of vendor-level
+   ingestors, then just add counties. The real insight: MI's 83 counties use
+   a handful of vendors, not 83 unique systems. mi_totalvote_feed.py and
+   mi_enhancedvoting_feed.py are already vendor-generic - adding another
+   county on either is a one-line addition to production_poller.py's
+   MI_TOTALVOTE_COUNTIES / MI_ENHANCEDVOTING_COUNTIES lists, zero new code.
+   mi_washtenaw_feed.py and mi_livingston_feed.py are genuine one-offs
+   (custom system, PDF) - fine to leave as-is. The actual task is discovery,
+   not engineering: find which of MI's other big counties are on TotalVote
+   or EnhancedVoting.
+
+3. Re-check Oakland, Macomb, and Genesee's Clarity instances. All three said
+   "Elections not available!" on Aug 4 - meaning not yet activated, not that
+   Clarity itself is a dead end. Clarity is a platform this project already
+   has strong, proven tooling for (same family as GA/AZ). If active now,
+   that's 3 more counties essentially for free.
+
+4. A calm, proper survey of MI's top ~15-20 counties by population - MI's
+   vote is concentrated enough that this likely covers 75%+ of the state.
+   Candidates to check next: Oakland, Macomb, Genesee (#3 above), then
+   Ingham, Ottawa, Kalamazoo, Saginaw, Berrien, and others. For each: find
+   their actual results page, identify the vendor, and either add to an
+   existing vendor list (cheap) or decide if a new one-off is worth it.
+
+5. Contact county clerks directly for any county that blocks automated
+   access (Oakland's main oakgov.com site returned 403 - a separate
+   elections.oaklandcountymi.gov domain wasn't blocked and is worth using
+   instead) or has no findable online system at all.
+
+6. Follow up on the DDHQ pricing conversation (contacted 2026-08-04, no
+   public pricing - quote-only). Confirmed via research: DDHQ's API is one
+   unified nationwide system, not per-state products - but whether they
+   offer scoped (fewer-states) pricing is unknown, ask directly when they
+   respond. If workable, this could replace the whole county-by-county
+   approach for MI, and possibly serve as a prepared fallback for TX too.
+
+7. Give TX the same advance attention MI needed reactively. TX's own March
+   2026 primary showed real, documented delays for specific counties
+   (hand-counts, big-county backlogs). Before Nov 3, identify TX's biggest
+   counties' own results systems now.
+
+8. Mid-late Oct, 2026 (already on the calendar): states publish the real
+   Nov 3 general at 0% reporting. Discover real electionIds for GA/MI/NC/TX/SC
+   and fill into production_poller.py's build_production_tasks(). Also:
+   replace MI's "TBD AUG 4" candidate placeholders in api/elections.py with
+   the real primary winners - Aug 4's county data strongly suggested Abdul
+   El-Sayed (60%+ across Wayne/Kent/Washtenaw/Livingston), but confirm
+   against an actual certified/official source before writing it into the
+   manifest, don't assume from partial county data alone.
+
+9. ~2 weeks before Nov 3 (already on the calendar, scope now sharpened): full
+   dry run, all 5 tracked states x Senate, against each state's live (empty)
+   Nov feed. This must specifically test TIMELINESS, not just final
+   accuracy - that's the exact gap that let MI's problem go undetected until
+   election night itself. If any of GA/NC/TX/SC shows the same "mechanism
+   works but nothing flows live" pattern, apply the same
+   county-level-fallback playbook developed for MI, with enough lead time to
+   do it calmly.
+
+10. Election week -> Nov 3: final rehearsal, ENABLE_POLLER=1 /
+    POLLER_MODE=prod, go live.
+
+Reminders / gotchas (still true, carried forward): baseline.db is gitignored
+- production only picks up local DB changes via a new GitHub Release +
+updated DB_URL (current tag: db-v3). Never run
+python ingestor/etl_baseline.py to add a state/year - destructive, rebuilds
+the whole DB from scratch. Always use a scratch race_type for any
+test/mechanics run, never a real tracked one. For any new county-level
+ingestor: check robots.txt first (CNN and DDHQ both explicitly disallow
+automated access - respected, not worked around); government county-clerk
+sites so far have had no such restriction. Add any new Python dependency to
+requirements.txt in the SAME commit as the code that needs it -
+beautifulsoup4 was missed once (2026-08-04) and crashed the entire poller
+process on Render, since it's a top-level import. API runs without --reload:
+restart uvicorn + click Reset in the UI after any api/ingestor code change.
+
+Longer-term / not urgent: WI and NV live feeds (general2028 prep only);
+precinct-level drill-down for GA/NC (optional precision upgrade);
+general2028 needs 2022 Senate data loaded (file already on disk).
