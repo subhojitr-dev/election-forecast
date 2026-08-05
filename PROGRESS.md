@@ -5,6 +5,33 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (later morning) — Render memory-limit auto-restart: diagnosed and fixed
+
+Render emailed an alert: the web service exceeded its memory limit and auto-restarted.
+Root cause, high confidence given the exact timing lines up: once MI's state-system
+electionId (706) appeared overnight, `_mi_primary_poll()` stopped short-circuiting on
+"not found" and started launching **two full headed-Chromium browsers every 90-second
+cycle** (`discover_election_id` + `fetch_zip_bytes` inside `ingest()`), continuously,
+only to hit the confirmed-empty 0-byte results file and throw an exception every single
+time (see the entry above this one). Dozens of full browser launches per hour,
+indefinitely, on a memory-constrained Starter-tier instance, for a task already
+documented as permanently dead.
+
+**Fix:** disabled that `PollTask` (`enabled=False`) in `production_poller.py` — pure
+cleanup, no functional loss, since this data source is already confirmed non-viable for
+Nov 3. Also fixed `start_xvfb_if_needed()`, which was matching on any task name starting
+with `"MI"` rather than the specific headed-browser task — meaning it was starting an
+unused virtual display for the 4 plain-HTTP county tasks too. Deployed and verified:
+service healthy, and the 4 real county pollers (Wayne/Kent/Washtenaw/Livingston) kept
+working throughout, with real growing vote totals (Wayne up to 279,596 votes by this
+check, much further along than overnight).
+
+**Not yet directly confirmed via Render's own memory graphs** (would need the dashboard
+Metrics tab) — this is the best available diagnosis from the code and timing alone. If
+memory issues recur after this fix, that's the next place to look, along with whether
+the newer county-level pollers (PDF parsing via `mi_livingston_feed.py` in particular)
+need their own investigation.
+
 ## 2026-08-05 (later morning) — MAJOR CORRECTION: Oakland/Macomb/Genesee's Clarity
 ## instances DO work — last night's "not activated" conclusion was wrong (stale
 ## URLs from search, not a real system limitation); found 7 more MI counties
