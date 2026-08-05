@@ -5,6 +5,44 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (morning, cont.) — researched real primary-night cadence for GA/NC/TX,
+## not just documentation; full comparison now in FEED_AUDIT.md's new "Round 2" section
+
+Following the MI finding below, went and checked whether GA/NC/TX (SC already has
+firsthand proof from June) actually delivered live data on THEIR OWN most recent real
+primary nights — not just what their documentation claims. Method: same as what worked
+for MI (Votebeat + other local election journalism covering the specific night), rather
+than generic "live results available" marketing pages.
+
+- **NC** (March 3, 2026 primary): multiple sources confirm results flowed the same
+  evening, county by county, as each finished counting — consistent with NC's own
+  documented 5-10 minute update cadence. Good secondhand evidence, no exact first-data
+  timestamp found.
+- **GA** (May 19, 2026 primary): "Results were updated immediately as they arrived from
+  the Georgia Secretary of State." Reinforces GA/AZ sharing the same live-updating
+  platform family (AZ already proven firsthand on Jul 21).
+- **TX** (March 3, 2026 primary, same day as NC): real, documented problems — Votebeat's
+  own headline was "2026 primary elections start off with a Texas-sized mess." Hand-count
+  delays in Gillespie/Eastland counties ran into the early-morning hours; large counties
+  (Harris/Dallas/Tarrant) were acknowledged as slower. Not MI-bad — an early-voting batch
+  does post shortly after close, a real partial signal, and the Senate outcome was
+  determined without a next-day wait — but real enough to warrant the same kind of
+  attention MI got, before Nov 3, not reactively.
+
+Full comparison table + verdicts (proven firsthand / good secondhand / moderate risk)
+now lives in **FEED_AUDIT.md**'s new "Round 2 — LIVE CADENCE" section, so it doesn't
+get buried in this log. Round 1 (already in that file) only confirmed each state's feed
+*mechanism* is correct against certified results — a fundamentally different, weaker
+claim than "delivers usable data during a live count," which is what Round 2 actually
+checks. The explicit lesson carried over from MI: a "strong (mechanism)" rating is not
+proof of anything about live-night behavior — don't repeat that mistake for TX or any
+other state before Nov 3.
+
+**Next planning step** (deferred to a dedicated session, not done live): a real,
+sustainable strategy for MI specifically — user explicitly flagged that 4 different
+one-off scrapers (HTML/JSON/HTML/PDF) for 4 of 83 counties isn't sustainable — plus
+whether TX needs a similar county-level fallback plan prepared in advance.
+
 ## 2026-08-05 (morning) — CONFIRMED: MI's state system (`mvic.sos.state.mi.us/
 ## votehistory`, what `mi_live_feed.py` polls) is not viable for live Nov 3
 ## tracking, full stop

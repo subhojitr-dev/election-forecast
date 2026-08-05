@@ -84,11 +84,43 @@ story, which is a different kind of work than the live-feed wiring below).
       `elections.json` is empty between elections; discover via browser closer to the night
       (same situation as MI).
 - [x] ~~NV, WI~~ — DEPRIORITIZED 2026-07-17 (no 2026 race for either; see takeaway #5).
-- [ ] **AZ on the actual night (Jul 21)**: confirm real vote/precinct-reporting numbers
-      move as expected (AZ's own 2026 primary ballot has no President/Senate race, so this
-      validates the FETCH MECHANICS via Governor, not a manifest data load).
-- [ ] **MI on the actual night (Aug 4)**: once the election-id appears, run the full
-      validation; confirm the headed-browser approach holds up under real polling cadence.
+- [x] ~~AZ on the actual night (Jul 21)~~ — PASSED. `uploadId` incremented repeatedly,
+      precincts/votes climbed off zero after poll close. See PROGRESS.md 2026-07-21.
+- [x] ~~MI on the actual night (Aug 4)~~ — **FAILED for the state system specifically.**
+      See Round 2 below — this is the important finding.
+
+---
+
+## Round 2 — LIVE CADENCE, not just mechanism (added 2026-08-05)
+
+Round 1 confirmed each state's live feed *mechanism* works and matches certified
+results. It did NOT confirm each state actually delivers data **during a real live
+count**, on a real election night, at a useful pace — that's a completely different
+question, and Round 1's "strong" ratings above should not be read as an answer to it.
+MI's own Round 1 rating was "strong (mechanism)" right up until Aug 4 proved the
+mechanism was pointed at a system that doesn't publish live at all. **Don't repeat
+that mistake for GA/NC/TX/SC** — below is what's actually been verified about each
+state's real cadence, either firsthand (best) or via retrospective research on that
+state's own most recent real primary (second-best; still real evidence, not
+documentation).
+
+| State | Real cadence evidence | Verdict |
+|---|---|---|
+| **MI** | Firsthand, Aug 4, 2026: state system (`mvic.sos.state.mi.us/votehistory`) had **zero data 11 hours after polls closed** — confirmed via Votebeat's own reporting to be structural (only shows a county once 100% done), not a one-off delay. | ❌ **CONFIRMED NOT VIABLE for Nov 3** — do not rely on `mi_live_feed.py`'s state-system path. See PROGRESS.md 2026-08-04/2026-08-05, and the county-level fallback (Wayne/Kent/Washtenaw/Livingston) built the same night. |
+| **SC** | Firsthand — validated live in June 2026 (SC's own primary), matched exactly. | ✅ **Directly proven**, not just documented. Strongest evidence of the 5. |
+| **NC** | Retrospective, NC's own March 3, 2026 primary: multiple news sources confirm results "became available at different times... as soon as all votes were counted in each county on the evening of March 3" — same night, not next-day. Consistent with NC's own documented "5-10 min" cadence. Did NOT find an exact "first data at X:XX PM" timestamp. | 🟡 **Good secondhand evidence**, same-night confirmed, precise timing not pinned down. |
+| **GA** | Retrospective, GA's own May 19, 2026 primary: "Results were updated immediately as they arrived from the Georgia Secretary of State." Consistent with GA/AZ sharing the same underlying live-updating platform family (AZ proven firsthand Jul 21). | 🟡 **Good secondhand evidence + architectural similarity to a proven system (AZ).** |
+| **TX** | Retrospective, TX's own March 3, 2026 primary (same day as NC): confirmed a **real, documented mess** ("2026 primary elections start off with a Texas-sized mess" — Votebeat) — hand-count delays in Gillespie/Eastland counties (counting into the early-morning hours), and large counties (Harris/Dallas/Tarrant) acknowledged as slower to report. BUT an early-voting batch does post shortly after polls close (a real partial signal, unlike MI's total silence), and the Senate outcome was determined without needing a next-day wait. | 🟠 **Moderate risk, bounded.** Better than MI (gets an immediate partial signal, resolves same night/next morning), worse than NC/GA/SC (real documented delays for specific counties/races). Worth extra attention in the Nov 3 dry run, and possibly a county-level fallback plan for TX's biggest counties too, not just MI's. |
+
+**Bottom line: MI is not a fluke to route around with a patch — treat every state's
+"live feed works" claim as unproven until it's tested against a REAL count in
+progress**, the same way MI's "strong (mechanism)" rating didn't survive contact
+with Aug 4. SC and AZ are the only two states in this project with genuine firsthand
+proof. NC and GA have good secondhand evidence. TX has real, documented risk that
+deserves the same kind of attention MI got — not urgent to fix now (no near-term TX
+primary to test against), but worth planning for before Nov 3, e.g. identifying
+TX's biggest counties' own results sites now, the same way MI's fallback was found,
+rather than reactively on election night.
 
 ---
 
