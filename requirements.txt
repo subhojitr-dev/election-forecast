@@ -9,8 +9,8 @@ fastapi       # Phase 4 — REST API + WebSocket
 uvicorn       # Phase 4 — ASGI server
 
 httpx         # Live-readiness — state live feeds (nc_*, ga_, pa_, az_live_feed): plain HTTP + JSON/zip
-beautifulsoup4  # mi_totalvote_feed.py, mi_washtenaw_feed.py — parse county-level results HTML
-pypdf         # mi_livingston_feed.py — parses county-level results PDF
+beautifulsoup4  # mi_totalvote_feed.py, mi_washtenaw_feed.py, mi_calhoun_feed.py — parse county-level results HTML
+pypdf         # mi_pdf_feed.py — parses county-level results PDF
 playwright    # mi_live_feed.py — MI's Cloudflare blocks headless + plain httpx; needs a
               # HEADED browser (see ingestor/mi_live_feed.py docstring). Local/election-night
               # only — NOT needed on the Render server (MI ingest runs from a machine with a

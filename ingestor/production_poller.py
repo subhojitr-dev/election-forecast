@@ -54,6 +54,7 @@ sys.path.insert(0, HERE)
 
 import az_live_feed
 import ga_live_feed
+import mi_calhoun_feed
 import mi_clarity_feed
 import mi_enhancedvoting_feed
 import mi_live_feed
@@ -246,7 +247,7 @@ def _mi_primary_poll():
 # actually gives real progress. Oakland/Macomb/Genesee were briefly thought
 # "not activated" on Aug 4 night -- wrong, that was stale electionIds from a
 # web search; going straight to each county's own page found the correct URLs
-# (see mi_clarity_feed.py). 11 counties confirmed as of 2026-08-05, ~70-75%
+# (see mi_clarity_feed.py). 15 counties confirmed as of 2026-08-05, ~74-76%
 # of the statewide vote (see PROGRESS.md). Each writes to its OWN precinct_id
 # row, so partial coverage (more counties can be added later) is honest, not
 # misleading -- a county has no row until it's added here.
@@ -316,6 +317,14 @@ def _mi_washtenaw_poll():
         return None
 
 
+def _mi_calhoun_poll():
+    try:
+        return mi_calhoun_feed.ingest()
+    except Exception as e:
+        log(f"    Calhoun: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def _mi_pdf_poll():
     results = []
     for pdf_url, fips, name in MI_PDF_COUNTIES:
@@ -342,6 +351,7 @@ def build_mi_primary_tasks() -> list[PollTask]:
         PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
         PollTask("MI primary — Clarity counties", 90, _mi_clarity_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
+        PollTask("MI primary — Calhoun", 90, _mi_calhoun_poll),
         PollTask("MI primary — PDF counties", 90, _mi_pdf_poll),
     ]
 

@@ -5,6 +5,38 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (midday) — 15th MI county added (Calhoun); coverage recomputed ~74-77%
+
+Added **Calhoun** (`mi_calhoun_feed.py`, FIPS `26025`) as the 15th county-level MI
+source: a genuinely custom-built results page at
+`elections.calhouncountymi.gov/August2026/` (Chart.js dashboard, dark-mode toggle) —
+but the underlying vote data is server-side rendered directly into the initial HTML
+(`<div class="contest" data-search="...">` blocks with a clean result table inside),
+not loaded dynamically, so a plain BeautifulSoup parse works with no browser needed.
+Same one-off category as Washtenaw (own bespoke system, not one of the two reusable
+vendor platforms). Result: El-Sayed 6,016 / Stevens 6,323 / McMorrow 687 (13,026 total
+votes). Verified locally (`python ingestor/mi_calhoun_feed.py`), then via a full
+`--mode mi-primary --once` pass alongside all 14 existing counties — all OK. Wired
+into `production_poller.py` as its own `PollTask` (`_mi_calhoun_poll`), same pattern
+as Washtenaw's standalone task.
+
+**Coverage recheck:** 15 counties now sum to **1,189,581 votes** (up from
+1,176,555 at 14 counties — Calhoun added 13,026). Against the same statewide estimate
+used before (~1.55-1.6M, from "more than 1.5 million ballots... 96% counted," no
+certified final total available), that's still **~74-77%** — Calhoun is a modest-sized
+county, so it didn't move the needle much beyond rounding. The bigger remaining gap is
+a handful of large counties not yet found/wired (see NEXT_SESSION_PROMPT.md for the
+next-tier list: Eaton, Bay, Midland were flagged but not yet checked; Jackson checked
+and ruled out — its PDF is precinct-level detail, not the cumulative-summary format
+`mi_pdf_feed.py` expects; St. Clair checked and ruled out — no live results system
+found, only a historical-results link).
+
+`requirements.txt` comment also fixed in this pass: was still referencing the deleted
+`mi_livingston_feed.py` — corrected to `mi_pdf_feed.py`, and added `mi_calhoun_feed.py`
+to the beautifulsoup4 consumer list.
+
+---
+
 ## 2026-08-05 (later morning) — Render memory-limit auto-restart: diagnosed and fixed
 
 Render emailed an alert: the web service exceeded its memory limit and auto-restarted.
