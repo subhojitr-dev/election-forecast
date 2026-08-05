@@ -5,6 +5,146 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-04 — MI Aug 4 primary night: the plan built on 07-30 didn't work as
+## expected; found and shipped a real fallback live, and drew concrete lessons
+## for Nov 3
+
+**What happened:** flipped `ENABLE_POLLER=1`/`POLLER_MODE=mi-primary` on Render
+ahead of tonight per the 07-30 plan. Polls closed 8:00 PM ET. MI's own official
+state system (`mvic.sos.state.mi.us/votehistory`) never showed anything —
+checked repeatedly for over an hour, still empty. This turned out to be
+**structural, not a delay**: MI's own election administrators (via Votebeat's
+2026-08-04 reporting) confirmed the state page only shows a county once that
+county's count is **100% complete**, with zero partial signal — "probably one
+of the slowest ways to get results." The same was true for MI's actual 2024
+general (unofficial statewide results didn't post until midday the *next
+day*). This is a real, load-bearing fact about MI's system, not a fluke.
+
+**Checked whether other tracked states share this problem** (NC/GA/SC/TX) —
+they don't appear to, based on how each one's own election administrators
+describe their systems: NC's dashboard explicitly updates every 5-10 minutes
+precinct-by-precinct; GA runs on the same Clarity platform family already
+proven live-responsive via AZ's Jul 21 test; SC we've directly validated live
+ourselves already (June primary). TX is a real middle case — an early-voting
+batch posts right after close, but full county totals wait for each county's
+own manual count to finish, which can run late for big counties (Harris,
+Dallas, Tarrant). **None of this is proven for Nov 3 specifically** — every
+validation so far (except SC and AZ) has been against already-certified
+archived data, not a real live count in progress.
+
+**Investigated a paid alternative — Decision Desk HQ.** Confirmed on their own
+public page they had real live MI Senate primary data (`MI US Senate — Leader:
+A. El-Sayed — 16% in`) while our own source showed nothing. Checked their
+`robots.txt`: `Disallow: /api/` — an explicit signal not to scrape their
+internal endpoints, so we didn't. User submitted a contact-form inquiry about
+their licensed API/embed pricing (no public pricing exists — quote-only,
+customers reportedly include newsrooms and Kalshi). Their own data source,
+per public reporting: ~4,000 local stringers with phone/fax relationships to
+county clerks, plus an API/scraping layer pulling from county and state
+election sites, plus staff physically at polling sites for big elections —
+i.e., the same fundamental approach as what we did below, just done at scale
+with paid verification. Also checked CNN as a possible source: their
+`robots.txt` explicitly disallows Claude/Anthropic bots by name — did not
+access.
+
+**Found and shipped a real fallback: individual MI county results systems.**
+MI's counties don't all report through the state; several run their own live
+systems. Found and wired up three, each on a different vendor, each verified
+against real live vote counts before deploying:
+- **Wayne County** (Detroit, MI's largest) — `michigan.totalvote.com/Wayne`,
+  server-rendered HTML, parsed with BeautifulSoup → `mi_totalvote_feed.py`.
+- **Kent County** (Grand Rapids) — `app.enhancedvoting.com`, a shared
+  multi-tenant platform with a clean JSON API → `mi_enhancedvoting_feed.py`.
+  Far better data quality than Wayne's page (82/202 precincts vs Wayne's
+  low single digits at the same point in the night).
+- **Washtenaw County** (Ann Arbor) — its own custom system at
+  `electionresults.ewashtenaw.org`, comprehensive HTML report covering every
+  race on the ballot → `mi_washtenaw_feed.py`.
+- **Checked and ruled out for tonight:** Oakland (their main site,
+  `oakgov.com`, actively blocks automated access with a 403 — found a
+  separate `elections.oaklandcountymi.gov` domain that isn't blocked, and it
+  links to a Clarity instance, but that instance says "Elections not
+  available!" — not yet activated for tonight, same pattern as MI's own
+  state system). Macomb and Genesee also run Clarity, same "not activated"
+  result. `mielections.us` (a second, distinct official MI results domain,
+  separate from `votehistory`) was unreachable all night from multiple
+  independent vantage points (my tools AND the user's own connection) —
+  likely a genuine outage/overload, not a source worth pursuing further
+  tonight.
+- All three write to the same scratch race_type (`mi_primary_2026`) via
+  `production_poller.py`, each as its own `PollTask` so one vendor failing
+  doesn't take down the others, and each scoped to only its own
+  `precinct_id` row so they don't conflict with each other or with
+  `mi_live_feed.py`'s broader delete (which would cleanly supersede all of
+  this with the real statewide picture, if MI's state system ever does
+  activate).
+- **Also fixed a real deploy bug found live tonight:** `beautifulsoup4` was
+  never added to `requirements.txt`, so `import mi_totalvote_feed` (which
+  needs `bs4`) crashed the *entire* poller process at startup on Render —
+  not just the new task, all of them, since it's a top-level import in
+  `production_poller.py`. Fixed immediately; confirmed the whole poller
+  (including the original MI task) came back once deployed correctly.
+- Combined result once all three counties were live: El-Sayed 73,918 (61.8%),
+  Stevens 41,707 (34.9%), McMorrow 3,996 (3.3%) — a meaningfully different,
+  more representative picture than any single county alone.
+
+**Also fixed a UI bug found along the way:** the dashboard's `selected` state
+defaulted to `'GA'` and assumed GA is always on the ballot (true for every
+election before tonight) — for the new single-state MI primary race, this
+meant the main detail panels were silently fetching/showing **Georgia's**
+(empty) data while the sidebar correctly showed Michigan. Added a safety-net
+effect in `App.jsx` that snaps `selected` to a valid state whenever the
+current one isn't on the ballot for the active race.
+
+**Also fixed a design bug per user feedback:** the dashboard originally
+framed tonight as "leading D vs leading R" — a head-to-head framing borrowed
+from the general-election UI, which is wrong for a primary (two *separate*
+intra-party contests, not one race). Added `GET /api/state/{abbr}/candidates`
+(full per-party candidate field, not just the leader) and a new
+`PrimaryLeaderboard` component that replaces the D-vs-R vote bar/gauge for
+primary races. Per explicit request, also scoped to the Democratic field only
+(the real contest tonight) — `mi_live_feed.ingest()` and the two new county
+ingestors all support a `parties={"DEM"}` filter that drops other parties'
+rows *before* they're ever written to `results_live`, not just hidden in the
+UI.
+
+**Win-probability question, asked and answered:** confirmed the dashboard's
+swing/win-probability panels are correctly *not* shown for this race — that
+machinery is fundamentally built around comparing to a same-seat historical
+baseline (none exists for a first-time 3-candidate primary matchup) and a
+binary two-party threshold (doesn't apply to a 3-candidate field). No baseline
+also means the model's own "projection" degrades gracefully to just the raw
+counted share, not a real projection — confirmed by design, not a gap to fix.
+
+### Concrete lessons for Nov 3 (recorded here; see also CONTEXT.md's runbook)
+
+1. **`mi_live_feed.py`'s state-system approach cannot be the only plan for MI
+   on Nov 3.** It's now proven, twice, not just theorized, that MI's own
+   portal doesn't deliver live data during counting. Need a real county-level
+   fallback in place *before* election night, not built live under pressure
+   like tonight — ideally extending tonight's three working ingestors to
+   cover more of MI's population before Nov 3.
+2. **Do a calm, proper survey of MI's top 10-15 counties before Nov 3** (not
+   live, not guessing URLs) — tonight found 3 by real effort; a dedicated
+   session with time to investigate could likely find several more,
+   including whichever vendor Oakland/Macomb/Genesee's Clarity instances
+   turn out to use once activated.
+3. **For counties that block automated access (Oakland's main site) or don't
+   have an obvious system, contact the county clerk directly** and ask about
+   legitimate data access — the same respectful approach already used with
+   DDHQ, more likely to work with a government office than a corporate one.
+4. **Follow up on the DDHQ pricing conversation.** If workable, one licensed
+   feed replaces this whole fragile "stitch together whichever counties
+   happen to be scrapable" approach — for MI specifically, and possibly as a
+   fallback for any other state that turns out to have the same problem.
+5. **Don't assume GA/NC/TX/SC are "documented as fine" and stop there** — MI
+   looked fine on paper too, until watched live. Use the existing "~2 weeks
+   before Nov 3" dry-run checkpoint to specifically test *timeliness*, not
+   just final accuracy, for all 5 tracked states. If a state is still not
+   delivering live data by that checkpoint, that's the trigger to either
+   pursue a DDHQ-style fallback for it too, or consciously accept and clearly
+   communicate that it'll lag on the real night.
+
 ## 2026-07-30 — found & fixed a real bug in the MI Aug-4-primary plan: `mi_live_feed.py`
 ## conflated OFFICE selection with the DB scratch label, would have crashed on the night
 
