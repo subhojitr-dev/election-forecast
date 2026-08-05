@@ -54,6 +54,7 @@ sys.path.insert(0, HERE)
 
 import az_live_feed
 import ga_live_feed
+import mi_bay_feed
 import mi_calhoun_feed
 import mi_clarity_feed
 import mi_enhancedvoting_feed
@@ -247,7 +248,7 @@ def _mi_primary_poll():
 # actually gives real progress. Oakland/Macomb/Genesee were briefly thought
 # "not activated" on Aug 4 night -- wrong, that was stale electionIds from a
 # web search; going straight to each county's own page found the correct URLs
-# (see mi_clarity_feed.py). 15 counties confirmed as of 2026-08-05, ~74-76%
+# (see mi_clarity_feed.py). 18 counties confirmed as of 2026-08-05, ~77-80%
 # of the statewide vote (see PROGRESS.md). Each writes to its OWN precinct_id
 # row, so partial coverage (more counties can be added later) is honest, not
 # misleading -- a county has no row until it's added here.
@@ -261,12 +262,14 @@ MI_ENHANCEDVOTING_COUNTIES = [
     ("saginaw-county-mi", "SaginawCountyAugust2026Primary", "26145", "SAGINAW"),
     ("berrien-county-mi", "2026Augustelection", "26021", "BERRIEN"),
     ("monroe-county-mi", "August2026Election", "26115", "MONROE"),
+    ("midland-county-mi", "AugustPrimary2026", "26111", "MIDLAND"),
 ]
 MI_CLARITY_COUNTIES = [
     ("https://results.enr.clarityelections.com/MI/Macomb", "126774", "26099", "MACOMB"),
     ("https://results.enr.clarityelections.com/MI/OaklandMI", "127075", "26125", "OAKLAND"),
     ("https://results.enr.clarityelections.com/MI/Genesee", "126773", "26049", "GENESEE"),
     ("https://www.miottawavotes.gov/MI/Ottawa", "126772", "26139", "OTTAWA"),
+    ("https://results.enr.clarityelections.com/MI/Eaton", "126881", "26045", "EATON"),
 ]
 # Periodically-regenerated PDF reports -- a common county-clerk report
 # template (mi_pdf_feed.py generalizes across different voting-method column
@@ -325,6 +328,14 @@ def _mi_calhoun_poll():
         return None
 
 
+def _mi_bay_poll():
+    try:
+        return mi_bay_feed.ingest()
+    except Exception as e:
+        log(f"    Bay: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def _mi_pdf_poll():
     results = []
     for pdf_url, fips, name in MI_PDF_COUNTIES:
@@ -352,6 +363,7 @@ def build_mi_primary_tasks() -> list[PollTask]:
         PollTask("MI primary — Clarity counties", 90, _mi_clarity_poll),
         PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
         PollTask("MI primary — Calhoun", 90, _mi_calhoun_poll),
+        PollTask("MI primary — Bay", 90, _mi_bay_poll),
         PollTask("MI primary — PDF counties", 90, _mi_pdf_poll),
     ]
 

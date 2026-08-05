@@ -5,6 +5,38 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (afternoon) — 3 more MI counties (Eaton, Bay, Midland) — 18 total, ~77-80% coverage
+
+Went straight to each county's own official elections page (same method that's worked
+every time this week) rather than trusting search results:
+
+- **Eaton** (`results.enr.clarityelections.com/MI/Eaton/126881`) — **Clarity**, slots
+  straight into the existing `mi_clarity_feed.py` with no code changes (just a new
+  tuple). 36/39 precincts reporting. El-Sayed 8,535 / Stevens 8,391 / McMorrow 1,079.
+- **Midland** (`app.enhancedvoting.com`, slug `midland-county-mi`) — **EnhancedVoting**.
+  The real August 2026 election_id (`AugustPrimary2026`) wasn't guessable from the
+  county's public page (which only linked a February special) — found it via the
+  `/api/jurisdictions/{slug}` discovery shortcut (documented in
+  `mi_enhancedvoting_feed.py`'s docstring), which lists every election that slug has
+  ever run. 33/33 reporting, 100% complete. El-Sayed 5,442 / Stevens 5,701 / McMorrow 546.
+- **Bay** (`baycountymi.gov`, a directly-linked PDF report) — a genuine **new PDF
+  template**, not compatible with `mi_pdf_feed.py`'s Livingston/Muskegon format: no
+  percentage columns at all, and TOTAL is the FIRST number on each line, not the last
+  (`Abdul El-Sayed 6,163 3,268 2,626 269` — the trailing 3 numbers are Election
+  Day/Absentee/Early Voting and sum to the total). Built a new one-off,
+  `mi_bay_feed.py`, rather than trying to force it through the existing generalized
+  parser. El-Sayed 6,163 / Stevens 8,165 / McMorrow 961.
+
+All three verified locally (individually, then via a full `--mode mi-primary --once`
+pass with all 18 counties together), wired into `production_poller.py` — Eaton and
+Midland as new entries in the existing `MI_CLARITY_COUNTIES` / `MI_ENHANCEDVOTING_COUNTIES`
+lists, Bay as its own standalone `PollTask` (`_mi_bay_poll`), same pattern as
+Calhoun/Washtenaw's one-off tasks.
+
+**Coverage: 18 counties now sum to 1,235,232 votes ≈ 77-80%** of the estimated
+statewide total (up from ~74-77% at 15 counties) — a real, meaningful jump this time,
+since Eaton/Bay/Midland are all moderately-sized counties, unlike Calhoun.
+
 ## 2026-08-05 (midday) — 15th MI county added (Calhoun); coverage recomputed ~74-77%
 
 Added **Calhoun** (`mi_calhoun_feed.py`, FIPS `26025`) as the 15th county-level MI

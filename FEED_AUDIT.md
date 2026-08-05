@@ -106,15 +106,15 @@ documentation).
 
 | State | Real cadence evidence | Verdict |
 |---|---|---|
-| **MI** | Firsthand, Aug 4, 2026: **state system** (`mvic.sos.state.mi.us/votehistory`) had **zero data 11 hours after polls closed** — confirmed via Votebeat's own reporting to be structural (only shows a county once 100% done), not a one-off delay. `mielections.us` (a separate official MI domain) checked twice, 13+ hours apart — persistently unreachable both times, not just election-night overload. **BUT the county level tells a completely different, much better story** — see the MI county table below. | ❌ **State system CONFIRMED NOT VIABLE** — do not rely on `mi_live_feed.py`'s state-system path or `mielections.us`. ✅ **County-level path is strong** — 15 counties wired with real, mostly-complete data by 2026-08-05 midday (~74-77% of the statewide vote), on just 2-3 reusable vendor platforms. See PROGRESS.md 2026-08-04/2026-08-05. |
+| **MI** | Firsthand, Aug 4, 2026: **state system** (`mvic.sos.state.mi.us/votehistory`) had **zero data 11 hours after polls closed** — confirmed via Votebeat's own reporting to be structural (only shows a county once 100% done), not a one-off delay. `mielections.us` (a separate official MI domain) checked twice, 13+ hours apart — persistently unreachable both times, not just election-night overload. **BUT the county level tells a completely different, much better story** — see the MI county table below. | ❌ **State system CONFIRMED NOT VIABLE** — do not rely on `mi_live_feed.py`'s state-system path or `mielections.us`. ✅ **County-level path is strong** — 18 counties wired with real, mostly-complete data by 2026-08-05 afternoon (~77-80% of the statewide vote), on just 2-3 reusable vendor platforms. See PROGRESS.md 2026-08-04/2026-08-05. |
 | **SC** | Firsthand — validated live in June 2026 (SC's own primary), matched exactly. | ✅ **Directly proven**, not just documented. Strongest evidence of the 5. |
 | **NC** | Retrospective, NC's own March 3, 2026 primary: multiple news sources confirm results "became available at different times... as soon as all votes were counted in each county on the evening of March 3" — same night, not next-day. Consistent with NC's own documented "5-10 min" cadence. Did NOT find an exact "first data at X:XX PM" timestamp. | 🟡 **Good secondhand evidence**, same-night confirmed, precise timing not pinned down. |
 | **GA** | Retrospective, GA's own May 19, 2026 primary: "Results were updated immediately as they arrived from the Georgia Secretary of State." Consistent with GA/AZ sharing the same underlying live-updating platform family (AZ proven firsthand Jul 21). | 🟡 **Good secondhand evidence + architectural similarity to a proven system (AZ).** |
 | **TX** | Retrospective, TX's own March 3, 2026 primary (same day as NC): confirmed a **real, documented mess** ("2026 primary elections start off with a Texas-sized mess" — Votebeat) — hand-count delays in Gillespie/Eastland counties (counting into the early-morning hours), and large counties (Harris/Dallas/Tarrant) acknowledged as slower to report. BUT an early-voting batch does post shortly after polls close (a real partial signal, unlike MI's total silence), and the Senate outcome was determined without needing a next-day wait. | 🟠 **Moderate risk, bounded.** Better than MI (gets an immediate partial signal, resolves same night/next morning), worse than NC/GA/SC (real documented delays for specific counties/races). Worth extra attention in the Nov 3 dry run, and possibly a county-level fallback plan for TX's biggest counties too, not just MI's. |
 
-### MI county-level detail (found 2026-08-04/05, 15 counties wired as of midday 08-05)
+### MI county-level detail (found 2026-08-04/05, 18 counties wired as of afternoon 08-05)
 
-The state system is dead, but individual counties are not — and it's not 15 unrelated
+The state system is dead, but individual counties are not — and it's not 18 unrelated
 one-offs, it's mostly 2 reusable platforms plus a handful of genuine one-offs:
 
 | County | Vendor | Votes |
@@ -130,14 +130,26 @@ one-offs, it's mostly 2 reusable platforms plus a handful of genuine one-offs:
 | Ottawa | **Clarity, white-labeled** on `miottawavotes.gov` | 38,346 |
 | Livingston | own custom system (PDF report) | 29,740 |
 | Saginaw | **EnhancedVoting** | 25,672 |
+| Bay | own custom system (PDF report, different template than Livingston/Muskegon) | 15,289 |
+| Eaton | **Clarity** (`MI/Eaton/{eid}`) | 18,005 |
 | Muskegon | own custom system (PDF report, generalized) | 22,950 |
 | Berrien | **EnhancedVoting** | 17,026 |
 | Monroe | **EnhancedVoting** | 15,919 |
+| Midland | **EnhancedVoting** | 11,689 |
 | Calhoun | own custom system (HTML, `data-search` attrs) | 13,026 |
 
-**Total: ~1,189,581 votes across 15 counties, ~74-77% of the estimated statewide
+**Total: ~1,235,232 votes across 18 counties, ~77-80% of the estimated statewide
 total** (no certified final total available; estimate is "more than 1.5 million
-ballots... 96% counted" per AP coverage — see PROGRESS.md 2026-08-05 midday entry).
+ballots... 96% counted" per AP coverage — see PROGRESS.md 2026-08-05 afternoon entry).
+
+**Third gotcha found (Bay County, 2026-08-05): PDF report templates are NOT
+universal across MI counties**, even though Livingston/Muskegon's format
+generalized cleanly. Bay's report has no percentage columns and puts TOTAL
+FIRST on each line, not last — the opposite convention from `mi_pdf_feed.py`'s
+template. Don't assume a new county's PDF matches an existing parser; check
+the raw extracted text before wiring it in (this is what caught it — Jackson's
+PDF also turned out incompatible, for a different reason: precinct-level detail
+instead of a cumulative summary).
 
 **Two real gotchas found for building a generic ingestor per vendor:**
 1. **Clarity can be white-labeled** on a county's own domain (Ottawa uses
