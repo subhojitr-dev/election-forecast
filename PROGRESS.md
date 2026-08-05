@@ -5,6 +5,36 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (morning) — CONFIRMED: MI's state system (`mvic.sos.state.mi.us/
+## votehistory`, what `mi_live_feed.py` polls) is not viable for live Nov 3
+## tracking, full stop
+
+Checked the morning after the Aug 4 primary. Two data points now, not one:
+
+- **~11 PM ET, Aug 4** (poll close + 3 hrs): `discover_election_id("8/4/2026")`
+  returned `None` — the election wasn't even configured in the system yet.
+- **~7:15 AM ET, Aug 5** (poll close + 11 hrs): the election IS now configured
+  (`electionId 706`), but the underlying bulk results file is **empty — 0
+  bytes** when fetched directly. So even 11 hours after polls closed, this
+  system has nothing usable.
+
+**Conclusion, stated plainly for planning purposes: this data source cannot
+be relied on for live tracking on Nov 3, 2026.** Not "probably slow" —
+confirmed, twice, across two different points in the timeline. This
+downgrades `mi_live_feed.py`'s state-system approach from "primary path,
+degraded" to "not part of the Nov 3 plan at all" — MI's actual Nov 3 coverage
+has to come from the county-level approach (Wayne/Kent/Washtenaw/Livingston,
+see below) or a paid alternative (DDHQ), not from this source, regardless of
+how much more polling time is given.
+
+**User's assessment, worth recording verbatim as it should anchor tomorrow's
+planning:** stitching together 4 different one-off scrapers (HTML, JSON API,
+another HTML, a PDF) for 4 of MI's 83 counties is not a sustainable approach
+for Nov 3. Explicitly deferred deciding on a real fix to a dedicated planning
+session — see CONTEXT.md's schedule for the plan (state-by-state cadence
+research using each state's own most recent real primary night, not just
+policy documentation, is next).
+
 ## 2026-08-04 — MI Aug 4 primary night: the plan built on 07-30 didn't work as
 ## expected; found and shipped a real fallback live, and drew concrete lessons
 ## for Nov 3

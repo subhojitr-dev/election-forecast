@@ -23,7 +23,7 @@
 | **~Aug 2–3, 2026** | Set `ENABLE_POLLER=1` + `POLLER_MODE=mi-primary` on Render (Environment tab) — starts the in-process poller checking for MI's Aug 4 election every 90s. Confirm it finds the electionId before the 4th (don't wait until the night itself). | ⬜ upcoming |
 | **Aug 4, 2026** | MI primary — the actual live validation. **Result: MI's own state system never worked** (structural — only shows a county once it's 100% done — see PROGRESS.md 2026-08-04). Found and shipped a real fallback live tonight: 3 individual MI county systems (Wayne/TotalVote, Kent/EnhancedVoting, Washtenaw/custom). Combined result: El-Sayed 61.8%, Stevens 34.9%, McMorrow 3.3%. | ✅ done (via fallback, not the original plan) |
 | **After Aug 4** | Set `ENABLE_POLLER=0` again (or leave running harmlessly — it'll just sit idle with nothing to poll). Decide whether to keep the Starter subscription through Oct/Nov or downgrade in between (if downgrading: **back up the DB to a new GitHub Release first** — the persistent disk goes away on Free tier). | ⬜ upcoming |
-| **Before mid-Oct** | **New, added after Aug 4's lesson** — do a calm, unhurried survey of MI's top 10-15 counties for more live-results sources (Aug 4 found 3 by real effort; more likely exist). For any that block automated access or have no findable system, contact the county clerk directly. Follow up on the DDHQ pricing conversation (contacted 2026-08-04, no public pricing — quote-only). See PROGRESS.md 2026-08-04 for full context. | ⬜ upcoming |
+| **Before mid-Oct** | **CONFIRMED 2026-08-05: MI's state system (`mi_live_feed.py`'s source) is NOT viable for Nov 3** — checked 11 hours after Aug 4 polls closed, still an empty file. Not "probably slow," confirmed dead for live purposes. Needs a real replacement plan, not a patch: (1) a calm, unhurried survey of MI's top 10-15 counties for more live-results sources (Aug 4 found 4 by real effort, each on a DIFFERENT vendor — user flagged this patchwork-of-one-offs approach as unsustainable, needs a simpler unified strategy, not more one-off scrapers); (2) follow up on the DDHQ pricing conversation (contacted 2026-08-04, no public pricing — quote-only); (3) research each OTHER tracked state's (GA/NC/TX/SC) own actual most-recent primary night — did their real systems deliver live data, and when did it start flowing — using real evidence, not just policy documentation. See PROGRESS.md 2026-08-04 and 2026-08-05 entries for full context. | ⬜ upcoming |
 | **Mid–late Oct 2026** | States publish the real Nov 3 general at 0% reporting. Discover the real electionIds for GA/MI/NC/TX/SC (AZ/PA not tracked this cycle) and fill them into `production_poller.py`'s `build_production_tasks()` (currently mostly `_tbd()` placeholders). Replace MI's "TBD AUG 4" candidate placeholders in `api/elections.py` with the real Aug 4 primary winners. | ⬜ upcoming |
 | **~2 weeks before Nov 3** | Full dry run: all 5 tracked states × Senate, against each state's live (empty) Nov feed. `--mode prod --once` is the smoke test. **Critically: this must check TIMELINESS, not just final accuracy** — Aug 4 proved a state can look fine on paper (documented as fast) and still not deliver live data in practice. If any of GA/NC/TX/SC turns out to have MI's problem, the same "hunt down county-level fallbacks" playbook from Aug 4 applies — do it now, not live on election night. | ⬜ upcoming |
 | **Election week (late Oct – Nov 2)** | Final rehearsal. Re-subscribe to Starter if it was downgraded. Confirm disk + poller + `ENABLE_POLLER=1`/`POLLER_MODE=prod`. | ⬜ upcoming |
@@ -166,9 +166,23 @@ news-aggregator JSON endpoint.)
     climbing from 0, vote totals moving. Clean up the test rows afterward (`DELETE FROM
     results_live WHERE race_type='az_primary_test'`) — they're not a tracked race.
 
-**MI — Aug 4 primary — UPDATED 2026-07-18, now has TWO ways to run it:**
+**MI — Aug 4 primary — RESOLVED 2026-08-05. Aug 4 has passed; this section is
+now a post-mortem, kept for what it teaches about Nov 3, not as a live plan.**
 
-  **Path A (the real plan): the poller, running on Render itself.**
+**Outcome:** Path A ran correctly (poller live on Render, checking every 90s)
+but its target — MI's state system — never delivered. Checked again 11 hours
+after polls closed (2026-08-05 ~7 AM ET): election now configured
+(`electionId 706`) but the results file is still 0 bytes. **CONFIRMED not
+viable for live Nov 3 tracking, not just "was slow that one night."** What
+actually worked instead: 4 individual MI county systems, discovered and
+wired in live during the night (Wayne/TotalVote, Kent/EnhancedVoting,
+Washtenaw/custom HTML, Livingston/PDF) — see PROGRESS.md's 2026-08-04 entry
+for the full story, each a genuinely different vendor/format. Flagged by the
+user as an unsustainable pattern to repeat 5 states over — Nov 3 needs a
+real plan, not more one-off scrapers. That planning is in progress; see
+CONTEXT.md's schedule table ("Before mid-Oct" row).
+
+  **Path A (as originally planned — kept for reference, not recommended as-is for Nov 3):**
   - Render is now on **Starter tier** with a **1GB persistent disk mounted at `/app/data/db`**
     (upgraded 2026-07-18 specifically for this). The Dockerfile has Xvfb + Chromium +
     Playwright's OS deps baked in (confirmed working — the build succeeded on Render).
