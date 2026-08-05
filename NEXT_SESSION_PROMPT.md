@@ -41,31 +41,37 @@ remain the only states with **firsthand** proof (both directly tested live).
 
 ## The Nov 3 readiness plan, in order
 
-**① First (cheap, do immediately): re-check `mielections.us`.** This is a
-*separate* official MI domain from `votehistory`, found via michigan.gov's own
-link — unreachable from multiple independent connections during Aug 4's peak
-traffic (likely overload, not a dead end). If it's actually a fast, unified
-statewide MI portal once traffic is normal, it could replace most of the
-county-by-county work below. One check settles this — do it before investing
-further in MI county work.
+**① DONE 2026-08-05 — `mielections.us` ruled out.** Checked twice, 13+ hours
+apart, from two independent network vantage points: DNS resolves, nothing
+responds on HTTP or HTTPS either time. Not election-night overload — persistently
+unreachable. Not worth pursuing further.
 
-**② Turn MI's "4 one-off scrapers" into a smaller set of *vendor-level*
-ingestors, then just add counties.** The real insight: MI's 83 counties use a
-handful of vendors, not 83 unique systems. `mi_totalvote_feed.py` and
-`mi_enhancedvoting_feed.py` are already vendor-generic — adding another county
-on either is a one-line addition to `production_poller.py`'s
-`MI_TOTALVOTE_COUNTIES` / `MI_ENHANCEDVOTING_COUNTIES` lists, zero new code.
-`mi_washtenaw_feed.py` and `mi_livingston_feed.py` are genuine one-offs (custom
-system, PDF) — fine to leave as-is, not worth generalizing for just one county
-each. **The actual task is discovery, not engineering**: find which of MI's
-other big counties are on TotalVote or EnhancedVoting.
-
-**③ Re-check Oakland, Macomb, and Genesee's Clarity instances.** All three said
-"Elections not available!" on Aug 4 — meaning not yet activated, not that
-Clarity itself is a dead end. Clarity is a platform this project already has
-strong, proven tooling for (same family as GA/AZ). If active now, that's 3 more
-counties essentially for free — no new ingestor needed, just Clarity's usual
-election-id discovery.
+**② DONE (research) / TODO (build) — MI county-level picture is much better than
+Aug 4 night suggested.** Went back the next morning and found last night's
+"Oakland/Macomb/Genesee Clarity not activated" conclusion was **wrong** — caused
+by stale electionIds from a generic web search, not an actual limitation. Going
+straight to each county's own official page (not search results) found working,
+mostly-complete data for all three, plus 4 more counties never checked before
+(Ingham, Ottawa, Kalamazoo, Saginaw). **11 MI counties now have confirmed real
+data** — see `FEED_AUDIT.md`'s MI county table and `PROGRESS.md`'s 2026-08-05
+entry for the full list, vendors, and numbers. Concrete build tasks that came out
+of this, not yet done:
+  - **Build a generic MI Clarity ingestor** (reusing the existing GA/AZ/PA
+    Clarity pattern) — covers Oakland, Macomb, Genesee, and Ottawa (4 of the 11).
+    Must accept the base domain as a parameter, not hardcode
+    `results.enr.clarityelections.com` — **Ottawa's instance is white-labeled**
+    on `miottawavotes.gov`, same platform, different domain.
+  - **Fix `mi_enhancedvoting_feed.py`'s contest-name matching to be fuzzy, not
+    exact.** Currently hardcodes `"United States Senator (DEM)"` (Kent's format)
+    — Kalamazoo and Ingham use `"DEM United States Senator"` (party prefix, no
+    parens) for the *same contest on the same platform*. Match on "senator" +
+    "dem" (case-insensitive substring), not an exact string.
+  - **Add Ingham, Kalamazoo, Saginaw to `MI_ENHANCEDVOTING_COUNTIES`** once the
+    fuzzy-match fix lands (their slugs/election-ids are already known — see
+    PROGRESS.md).
+  - **Continue the county survey** beyond these 11 — same method (each county's
+    own official page, never trust a search-result URL without confirming it's
+    current) — MI's next-biggest unchecked counties are worth checking next.
 
 **④ A calm, proper survey of MI's top ~15-20 counties by population** — MI's
 vote is concentrated enough that this likely covers 75%+ of the state.
