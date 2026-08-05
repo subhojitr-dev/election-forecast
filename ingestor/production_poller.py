@@ -55,6 +55,7 @@ sys.path.insert(0, HERE)
 import az_live_feed
 import ga_live_feed
 import mi_live_feed
+import mi_totalvote_feed
 import nc_live_feed
 import pa_live_feed
 import sc_live_feed
@@ -229,10 +230,34 @@ def _mi_primary_poll():
                                 parties={"DEM"})
 
 
+# Individual MI counties confirmed to run their own live results system at
+# michigan.totalvote.com (discovered 2026-08-04 — MI's state system doesn't
+# show a county until it's 100% done, but this shows real partial progress).
+# Not every county uses TotalVote (Oakland/Macomb/Kent/Genesee checked and
+# don't, at least not discoverably) — add more (slug, cid, fips, name) tuples
+# here as they're found. Each is written to its OWN precinct_id row (see
+# mi_totalvote_feed.ingest()'s docstring for why), so partial coverage here
+# is honest, not misleading — a county simply has no row until it's added.
+MI_TOTALVOTE_COUNTIES = [
+    ("Wayne", "05", "26163", "WAYNE"),
+]
+
+
+def _mi_totalvote_poll():
+    results = []
+    for slug, cid, fips, name in MI_TOTALVOTE_COUNTIES:
+        try:
+            results.append(mi_totalvote_feed.ingest(slug, cid, fips, name))
+        except Exception as e:
+            log(f"    TotalVote {name}: FAILED — {type(e).__name__}: {e}")
+    return {"counties": [r["county"] for r in results]} if results else None
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
     return [
         PollTask("MI primary (8/4/2026)", 90, _mi_primary_poll,
                   enabled=_mi_available()),
+        PollTask("MI primary — TotalVote counties", 90, _mi_totalvote_poll),
     ]
 
 
