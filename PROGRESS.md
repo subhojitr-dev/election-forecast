@@ -5,6 +5,68 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-05 (later morning) — MAJOR CORRECTION: Oakland/Macomb/Genesee's Clarity
+## instances DO work — last night's "not activated" conclusion was wrong (stale
+## URLs from search, not a real system limitation); found 7 more MI counties
+
+Went back to re-check `mielections.us` (confirmed still unreachable — DNS resolves,
+nothing responds on HTTP/HTTPS, checked 13+ hours apart from two independent network
+vantage points; downgraded from "might be a quick win" to "persistently down, not
+worth further investigation right now" — see FEED_AUDIT.md).
+
+While re-checking Oakland/Macomb/Genesee's Clarity status, found the real problem:
+last night's URLs (`MI/Oakland/126183`, from a generic web search) were **stale,
+pointing at an old May 2026 local election**, not tonight's primary. Going directly
+to each county's own official elections page (same method that found Livingston and
+Washtenaw) surfaced the correct, current URLs — and all three **do** work, two of
+them fully complete:
+
+- **Oakland** (`MI/OaklandMI/127075` — note the different jurisdiction slug,
+  "OaklandMI" not "Oakland"): 91.11% reporting. Stevens 130,640 / El-Sayed 114,374 /
+  McMorrow 7,298.
+- **Macomb** (`MI/Macomb/126774`, a different electionId than the stale one found
+  last night): 100% (250/250). Stevens 59,381 / El-Sayed 50,817 / McMorrow 4,465.
+- **Genesee** (`MI/Genesee/126773`): 100%. Stevens 33,117 (54.0%) / El-Sayed 25,433
+  (41.4%) / McMorrow 2,785 (4.5%).
+
+Continued checking more of MI's largest counties the same way (each county's own
+official page, not search results) and found **5 more, all complete or
+near-complete**:
+
+- **Ingham** — EnhancedVoting (`ingham-county-mi`/`AugustElection08042026`). 100%
+  (81/81). El-Sayed 33,243 / Stevens 20,393 / McMorrow 2,669.
+- **Ottawa** — Clarity, but **white-labeled** on the county's own domain
+  (`miottawavotes.gov/MI/Ottawa/126772`, not `results.enr.clarityelections.com`) —
+  a real gotcha for any generic Clarity ingestor: don't hardcode the base domain.
+  100% (103/103). El-Sayed 21,208 (55.3%) / Stevens 15,563 / McMorrow 1,575.
+- **Kalamazoo** — EnhancedVoting (`kalamazoo-county-mi`/`August-2026-Primary-Election`).
+  100% (85/85). El-Sayed 26,133 / Stevens 17,942 / McMorrow 2,039. Found a second
+  real gotcha here: **the contest name string varies by county even within the same
+  EnhancedVoting platform** — Kent uses `"United States Senator (DEM)"`, Kalamazoo
+  and Ingham use `"DEM United States Senator"` (party prefix, no parens). A generic
+  ingestor needs fuzzy/regex matching on contest name, not an exact string.
+- **Saginaw** — EnhancedVoting (`saginaw-county-mi`/`SaginawCountyAugust2026Primary`).
+  100% (71/71). **Stevens actually leads here**, 14,501 to El-Sayed's 9,840 — real
+  county-level variation, not a uniform statewide trend.
+
+**Total: 11 MI counties now have real data** (the 4 from Aug 4 night + these 7),
+covering a large share of the state's vote, and — the important structural
+finding — **just two vendor platforms account for 8 of the 11**: EnhancedVoting
+(Kent, Ingham, Ottawa's cousin-pattern aside, Kalamazoo, Saginaw) and Clarity
+(Oakland, Macomb, Genesee, Ottawa). This substantially changes last night's
+"unsustainable one-off-per-county" concern — the real remaining work is mostly
+**discovery** (finding more counties' correct URLs on these same two platforms),
+not new engineering, since both `mi_enhancedvoting_feed.py` and a Clarity-based
+ingestor (not yet built for MI, but the pattern already exists from GA/AZ/PA) are
+reusable across any county on that vendor.
+
+**Not yet wired into the live poller/dashboard** — this was a research pass to
+correct the record and inform the Nov 3 plan, not a live deployment session. See
+`NEXT_SESSION_PROMPT.md`'s step ② for the follow-up: build a generic Clarity
+ingestor for MI (reusing the GA/AZ/PA pattern, parameterized by base domain since
+Ottawa proved counties can white-label it), fix the EnhancedVoting contest-name
+matching to be fuzzy, and continue the county survey.
+
 ## 2026-08-05 (morning, cont.) — researched real primary-night cadence for GA/NC/TX,
 ## not just documentation; full comparison now in FEED_AUDIT.md's new "Round 2" section
 
