@@ -54,8 +54,10 @@ sys.path.insert(0, HERE)
 
 import az_live_feed
 import ga_live_feed
+import mi_enhancedvoting_feed
 import mi_live_feed
 import mi_totalvote_feed
+import mi_washtenaw_feed
 import nc_live_feed
 import pa_live_feed
 import sc_live_feed
@@ -230,16 +232,21 @@ def _mi_primary_poll():
                                 parties={"DEM"})
 
 
-# Individual MI counties confirmed to run their own live results system at
-# michigan.totalvote.com (discovered 2026-08-04 — MI's state system doesn't
-# show a county until it's 100% done, but this shows real partial progress).
-# Not every county uses TotalVote (Oakland/Macomb/Kent/Genesee checked and
-# don't, at least not discoverably) — add more (slug, cid, fips, name) tuples
-# here as they're found. Each is written to its OWN precinct_id row (see
-# mi_totalvote_feed.ingest()'s docstring for why), so partial coverage here
-# is honest, not misleading — a county simply has no row until it's added.
+# Individual MI counties confirmed to run their own live results system,
+# split by vendor since each needs different ingest() args. Discovered
+# 2026-08-04 -- MI's state system doesn't show a county until it's 100% done
+# (see mi_live_feed.py's docstring), so these county-level sources are what
+# actually gives real partial progress tonight. Not every county is on one
+# of these three vendors (Oakland/Macomb/Genesee run Clarity but hadn't
+# activated tonight's election as of this writing) -- add more tuples below
+# as more counties are found. Each writes to its OWN precinct_id row, so
+# partial coverage is honest, not misleading -- a county has no row until
+# it's added here.
 MI_TOTALVOTE_COUNTIES = [
     ("Wayne", "05", "26163", "WAYNE"),
+]
+MI_ENHANCEDVOTING_COUNTIES = [
+    ("kent-county-mi", "08042026", "26081", "KENT"),
 ]
 
 
@@ -253,11 +260,31 @@ def _mi_totalvote_poll():
     return {"counties": [r["county"] for r in results]} if results else None
 
 
+def _mi_enhancedvoting_poll():
+    results = []
+    for slug, eid, fips, name in MI_ENHANCEDVOTING_COUNTIES:
+        try:
+            results.append(mi_enhancedvoting_feed.ingest(slug, eid, fips, name))
+        except Exception as e:
+            log(f"    EnhancedVoting {name}: FAILED — {type(e).__name__}: {e}")
+    return {"counties": [r["county"] for r in results]} if results else None
+
+
+def _mi_washtenaw_poll():
+    try:
+        return mi_washtenaw_feed.ingest()
+    except Exception as e:
+        log(f"    Washtenaw: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
     return [
         PollTask("MI primary (8/4/2026)", 90, _mi_primary_poll,
                   enabled=_mi_available()),
         PollTask("MI primary — TotalVote counties", 90, _mi_totalvote_poll),
+        PollTask("MI primary — EnhancedVoting counties", 90, _mi_enhancedvoting_poll),
+        PollTask("MI primary — Washtenaw", 90, _mi_washtenaw_poll),
     ]
 
 
