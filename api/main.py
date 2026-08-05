@@ -288,6 +288,17 @@ def state_candidates(abbr: str, response: Response, race: str = Query("president
                GROUP BY party, candidate
                ORDER BY party, votes DESC""",
             (race, f"{abbr}-%")).fetchall()
+        # Per-county breakdown, sourced directly from results_live (not the
+        # baseline-driven county_rollups() used elsewhere) — a primary has no
+        # baseline to roll up against, but the live-by-county picture is real
+        # and worth showing. Joins precincts for a human county name.
+        county_rows = conn.execute(
+            """SELECT p.county AS county, rl.candidate, rl.party, SUM(rl.votes) AS votes
+               FROM results_live rl JOIN precincts p ON rl.precinct_id = p.id
+               WHERE rl.race_type=? AND rl.precinct_id LIKE ?
+               GROUP BY p.county, rl.candidate, rl.party
+               ORDER BY p.county, votes DESC""",
+            (race, f"{abbr}-%")).fetchall()
     finally:
         conn.close()
     by_party: dict[str, list[dict]] = {}
@@ -297,7 +308,20 @@ def state_candidates(abbr: str, response: Response, race: str = Query("president
         total = sum(c["votes"] for c in cands) or 1
         for c in cands:
             c["share"] = c["votes"] / total
-    return {"state": abbr, "race_type": race, "by_party": by_party}
+
+    by_county: dict[str, list[dict]] = {}
+    for r in county_rows:
+        by_county.setdefault(r["county"], []).append(
+            {"candidate": r["candidate"], "party": r["party"], "votes": r["votes"]})
+    counties = []
+    for county, cands in by_county.items():
+        total = sum(c["votes"] for c in cands) or 1
+        for c in cands:
+            c["share"] = c["votes"] / total
+        counties.append({"county": county, "total_votes": total, "candidates": cands})
+    counties.sort(key=lambda c: c["total_votes"], reverse=True)
+
+    return {"state": abbr, "race_type": race, "by_party": by_party, "by_county": counties}
 
 
 @app.get("/api/state/{abbr}/series")
