@@ -1,0 +1,478 @@
+[
+ {
+  "county": "STATEWIDE UOCAVA",
+  "county_fips": "23000",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 4068
+ },
+ {
+  "county": "STATEWIDE UOCAVA",
+  "county_fips": "23000",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 363
+ },
+ {
+  "county": "STATEWIDE UOCAVA",
+  "county_fips": "23000",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 113
+ },
+ {
+  "county": "STATEWIDE UOCAVA",
+  "county_fips": "23000",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 1089
+ },
+ {
+  "county": "ANDROSCOGGIN",
+  "county_fips": "23001",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 22181
+ },
+ {
+  "county": "ANDROSCOGGIN",
+  "county_fips": "23001",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 2438
+ },
+ {
+  "county": "ANDROSCOGGIN",
+  "county_fips": "23001",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 1090
+ },
+ {
+  "county": "ANDROSCOGGIN",
+  "county_fips": "23001",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 32979
+ },
+ {
+  "county": "AROOSTOOK",
+  "county_fips": "23003",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 9750
+ },
+ {
+  "county": "AROOSTOOK",
+  "county_fips": "23003",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1072
+ },
+ {
+  "county": "AROOSTOOK",
+  "county_fips": "23003",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 743
+ },
+ {
+  "county": "AROOSTOOK",
+  "county_fips": "23003",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 24033
+ },
+ {
+  "county": "CUMBERLAND",
+  "county_fips": "23005",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 105308
+ },
+ {
+  "county": "CUMBERLAND",
+  "county_fips": "23005",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 11907
+ },
+ {
+  "county": "CUMBERLAND",
+  "county_fips": "23005",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 2138
+ },
+ {
+  "county": "CUMBERLAND",
+  "county_fips": "23005",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 74592
+ },
+ {
+  "county": "FRANKLIN",
+  "county_fips": "23007",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 6276
+ },
+ {
+  "county": "FRANKLIN",
+  "county_fips": "23007",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 969
+ },
+ {
+  "county": "FRANKLIN",
+  "county_fips": "23007",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 322
+ },
+ {
+  "county": "FRANKLIN",
+  "county_fips": "23007",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 9817
+ },
+ {
+  "county": "HANCOCK",
+  "county_fips": "23009",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 15379
+ },
+ {
+  "county": "HANCOCK",
+  "county_fips": "23009",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1821
+ },
+ {
+  "county": "HANCOCK",
+  "county_fips": "23009",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 736
+ },
+ {
+  "county": "HANCOCK",
+  "county_fips": "23009",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 17371
+ },
+ {
+  "county": "KENNEBEC",
+  "county_fips": "23011",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 27664
+ },
+ {
+  "county": "KENNEBEC",
+  "county_fips": "23011",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 3407
+ },
+ {
+  "county": "KENNEBEC",
+  "county_fips": "23011",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 1324
+ },
+ {
+  "county": "KENNEBEC",
+  "county_fips": "23011",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 39481
+ },
+ {
+  "county": "KNOX",
+  "county_fips": "23013",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 12190
+ },
+ {
+  "county": "KNOX",
+  "county_fips": "23013",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1461
+ },
+ {
+  "county": "KNOX",
+  "county_fips": "23013",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 399
+ },
+ {
+  "county": "KNOX",
+  "county_fips": "23013",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 11705
+ },
+ {
+  "county": "LINCOLN",
+  "county_fips": "23015",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 10102
+ },
+ {
+  "county": "LINCOLN",
+  "county_fips": "23015",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1111
+ },
+ {
+  "county": "LINCOLN",
+  "county_fips": "23015",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 349
+ },
+ {
+  "county": "LINCOLN",
+  "county_fips": "23015",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 12075
+ },
+ {
+  "county": "OXFORD",
+  "county_fips": "23017",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 11705
+ },
+ {
+  "county": "OXFORD",
+  "county_fips": "23017",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1511
+ },
+ {
+  "county": "OXFORD",
+  "county_fips": "23017",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 635
+ },
+ {
+  "county": "OXFORD",
+  "county_fips": "23017",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 19567
+ },
+ {
+  "county": "PENOBSCOT",
+  "county_fips": "23019",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 28958
+ },
+ {
+  "county": "PENOBSCOT",
+  "county_fips": "23019",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 3461
+ },
+ {
+  "county": "PENOBSCOT",
+  "county_fips": "23019",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 1600
+ },
+ {
+  "county": "PENOBSCOT",
+  "county_fips": "23019",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 51088
+ },
+ {
+  "county": "PISCATAQUIS",
+  "county_fips": "23021",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 2655
+ },
+ {
+  "county": "PISCATAQUIS",
+  "county_fips": "23021",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 394
+ },
+ {
+  "county": "PISCATAQUIS",
+  "county_fips": "23021",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 210
+ },
+ {
+  "county": "PISCATAQUIS",
+  "county_fips": "23021",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 6603
+ },
+ {
+  "county": "SAGADAHOC",
+  "county_fips": "23023",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 10787
+ },
+ {
+  "county": "SAGADAHOC",
+  "county_fips": "23023",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1354
+ },
+ {
+  "county": "SAGADAHOC",
+  "county_fips": "23023",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 337
+ },
+ {
+  "county": "SAGADAHOC",
+  "county_fips": "23023",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 11558
+ },
+ {
+  "county": "SOMERSET",
+  "county_fips": "23025",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 7355
+ },
+ {
+  "county": "SOMERSET",
+  "county_fips": "23025",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1770
+ },
+ {
+  "county": "SOMERSET",
+  "county_fips": "23025",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 525
+ },
+ {
+  "county": "SOMERSET",
+  "county_fips": "23025",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 17861
+ },
+ {
+  "county": "WALDO",
+  "county_fips": "23027",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 9768
+ },
+ {
+  "county": "WALDO",
+  "county_fips": "23027",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 1604
+ },
+ {
+  "county": "WALDO",
+  "county_fips": "23027",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 394
+ },
+ {
+  "county": "WALDO",
+  "county_fips": "23027",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 12538
+ },
+ {
+  "county": "WASHINGTON",
+  "county_fips": "23029",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 5251
+ },
+ {
+  "county": "WASHINGTON",
+  "county_fips": "23029",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 547
+ },
+ {
+  "county": "WASHINGTON",
+  "county_fips": "23029",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 338
+ },
+ {
+  "county": "WASHINGTON",
+  "county_fips": "23029",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 11196
+ },
+ {
+  "county": "YORK",
+  "county_fips": "23031",
+  "candidate": "SARA I GIDEON",
+  "party": "DEM",
+  "votes": 57826
+ },
+ {
+  "county": "YORK",
+  "county_fips": "23031",
+  "candidate": "LISA SAVAGE",
+  "party": "OTH",
+  "votes": 5389
+ },
+ {
+  "county": "YORK",
+  "county_fips": "23031",
+  "candidate": "MAX PATRICK LINN",
+  "party": "OTH",
+  "votes": 2255
+ },
+ {
+  "county": "YORK",
+  "county_fips": "23031",
+  "candidate": "SUSAN MARGARET COLLINS",
+  "party": "REP",
+  "votes": 64092
+ }
+]

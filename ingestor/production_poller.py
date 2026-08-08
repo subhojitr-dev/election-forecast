@@ -421,8 +421,10 @@ def build_mi_primary_tasks() -> list[PollTask]:
         # fresh production DB, then already_seeded() makes every run after
         # that an instant no-op.
         PollTask("Governor 2022 baseline seed (GA/AZ/TX)", 21600, _governor_2022_baseline_seed),
-        # Downloads a 164MB national file on first run only (no per-state
-        # version exists for this dataset — see etl_me_baseline.py).
+        # No download at all — loads a small fixture file committed alongside
+        # etl_me_baseline.py (its source dataset requires a Dataverse Guestbook
+        # response, a one-time human form, so it can't be fetched at runtime —
+        # see that script's docstring). Runs almost instantly.
         PollTask("Maine 2020 Senate baseline seed", 21600, _me_baseline_seed),
     ]
 
