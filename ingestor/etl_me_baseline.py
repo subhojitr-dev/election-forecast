@@ -72,13 +72,28 @@ def is_stat(candidate):
     return isinstance(candidate, str) and candidate.strip().upper() in STAT_CANDIDATES
 
 
+CHUNKSIZE = 200_000  # bounds memory regardless of the source file's size — this is a
+# 164MB NATIONAL file (34 states) and we only want Maine's slice of it. Read in
+# chunks, filter each one down to ME rows only, and only ever hold that (tiny) result
+# in memory. Same pattern etl_baseline.py / etl_governor_2022.py use.
+
+
 def load():
-    df = pd.read_csv(
+    parts = []
+    reader = pd.read_csv(
         CSV, dtype={"county_fips": str, "candidate": str, "county_name": str,
-                     "state_po": str, "party_simplified": str}, low_memory=False,
+                     "state_po": str, "party_simplified": str},
         usecols=["state_po", "county_fips", "county_name", "candidate",
-                 "party_simplified", "votes", "stage"])
-    df = df[(df["state_po"] == "ME") & (df["stage"].astype(str).str.upper() == "GEN")]
+                 "party_simplified", "votes", "stage"],
+        chunksize=CHUNKSIZE, low_memory=False)
+    for chunk in reader:
+        chunk = chunk[(chunk["state_po"] == "ME") & (chunk["stage"].astype(str).str.upper() == "GEN")]
+        if len(chunk):
+            parts.append(chunk)
+    df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if df.empty:
+        return df
+
     df = df[~df["candidate"].map(is_stat)]
     df["votes"] = pd.to_numeric(df["votes"], errors="coerce")
     df = df[df["votes"].notna() & (df["votes"] >= 0)]
@@ -142,6 +157,9 @@ def main(force=False):
     ingest(conn, load())
     conn.commit()
     conn.close()
+    # NOT deleted after use (unlike etl_governor_2022.py's per-state files) —
+    # this is the SAME shared file etl_baseline.py's SOURCES list expects for a
+    # local full-rebuild dev workflow, not a file dedicated to this script alone.
 
 
 if __name__ == "__main__":

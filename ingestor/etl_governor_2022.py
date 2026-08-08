@@ -84,14 +84,33 @@ def is_stat(candidate):
     return isinstance(candidate, str) and candidate.strip().upper() in STAT_CANDIDATES
 
 
+CHUNKSIZE = 200_000  # bounds memory regardless of the source file's size (100-165MB
+# on disk can otherwise balloon to several times that once pandas parses it) — read in
+# chunks, filter each one down to the handful of Governor rows it contains, and only
+# ever hold the (small) filtered result in memory. Same pattern etl_baseline.py uses.
+
+
 def load_state(state, path):
-    df = pd.read_csv(
+    parts = []
+    reader = pd.read_csv(
         path, sep="\t", usecols=["office", "stage", "state_po", "county_fips",
                                   "county_name", "candidate", "party_simplified", "votes",
                                   "mode", "precinct"],
         dtype={"county_fips": str, "candidate": str, "county_name": str, "precinct": str},
-        low_memory=False)
-    df = df[(df["office"] == "GOVERNOR") & (df["stage"].astype(str).str.upper() == "GEN")]
+        chunksize=CHUNKSIZE, low_memory=False)
+    for chunk in reader:
+        chunk = chunk[(chunk["office"] == "GOVERNOR") & (chunk["stage"].astype(str).str.upper() == "GEN")]
+        if len(chunk):
+            parts.append(chunk)
+    df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if df.empty:
+        return df
+
+    # Everything below runs on the already-filtered (small — Governor is one
+    # contest out of dozens on this file) result, not the raw file, so it's
+    # safe to do the precinct-level TOTAL-vs-granular-mode logic below in one
+    # pass instead of per-chunk (a precinct's rows could otherwise land split
+    # across two different 200k-row chunks and be judged incorrectly).
     df = df[~df["candidate"].map(is_stat)]
     df["votes"] = pd.to_numeric(df["votes"], errors="coerce")
     df = df[df["votes"].notna() & (df["votes"] >= 0)]
@@ -168,6 +187,7 @@ def main(force=False):
         path = _ensure_downloaded(filename, file_id)
         df = load_state(state, path)
         ingest(conn, state, df)
+        os.remove(path)  # already in the DB — don't leave ~100MB/state on disk
     conn.commit()
     conn.close()
 
