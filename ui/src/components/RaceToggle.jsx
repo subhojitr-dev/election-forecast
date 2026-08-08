@@ -1,7 +1,7 @@
 // Panel 2 — Race Toggle. Buttons are driven by the active election's race list
 // (from the ballot manifest), so on a real election night only the contests
 // actually happening appear (e.g. Nov-2026 = Senate only, no President).
-const LABEL = { president: 'President', senate: 'Senate', senate_special: 'GA Special' }
+const LABEL = { president: 'President', senate: 'Senate', senate_special: 'GA Special (Warnock)' }
 const TITLE = { senate_special: 'Georgia-only: the Jan-2021 Warnock vs Loeffler special-seat runoff' }
 
 export default function RaceToggle({ races, race, onChange }) {

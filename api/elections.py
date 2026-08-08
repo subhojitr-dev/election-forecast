@@ -18,7 +18,7 @@ announced (that's the only part not knowable far ahead).
 from __future__ import annotations
 
 ALL8 = ["GA", "PA", "AZ", "NV", "WI", "MI", "NC", "TX"]
-RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special",
+RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special (Warnock)",
               "governor": "Governor",
               "mi_primary_2026": "Michigan Senate Primary — Democratic Field",
               "ga_gov_primary_2026": "Georgia Governor Primary — Both Fields"}
