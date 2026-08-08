@@ -64,6 +64,16 @@ ELECTIONS = {
     "general2026": {
         "label": "General · Nov 3, 2026 (midterm)",
         "date": "2026-11-03",
+        # "real": populated by the production poller writing directly to
+        # results_live, never the /api/sim/* simulator — the UI hides
+        # Reset/Next Batch for these (see App.jsx). This isn't just cosmetic:
+        # the simulator's reset() deletes+rewrites results_live scoped only by
+        # (race_type, state), not by election, so a Demo-mode Reset for
+        # "senate" would delete the SAME rows this election's real GA/MI/NC/TX
+        # data lives in (they share every one of those states + the race_type
+        # string). Keeping this flag true is what keeps that button hidden
+        # here and prevents that collision from ever being reachable via the UI.
+        "real": True,
         # No presidential race in 2026. Senate = Class-2 seats only.
         "races": {"senate": ["GA", "MI", "NC", "TX", "SC", "ME"],
                   # Governor: GA/AZ/TX all last contested 2022 (Kemp/Hobbs/Abbott's
@@ -132,6 +142,7 @@ ELECTIONS = {
     "general2028": {
         "label": "General · Nov 7, 2028 (needs 2022 Senate data)",
         "date": "2028-11-07",
+        "real": True,  # see general2026's "real" comment above — same reasoning
         "races": {"president": ALL8, "senate": ["GA", "AZ", "NV", "PA", "WI", "NC"]},
         "president_baseline": 2024,
         # Class-3 seats last contested 2022 -> need the 2022 Senate file loaded (TODO).
@@ -176,6 +187,6 @@ def candidates(eid, race, state):
 
 
 def listing():
-    return [{"id": k, "label": v["label"], "date": v["date"],
+    return [{"id": k, "label": v["label"], "date": v["date"], "real": v.get("real", False),
              "races": [{"id": r, "label": RACE_LABEL[r]} for r in races_for(k)]}
             for k, v in ELECTIONS.items()]

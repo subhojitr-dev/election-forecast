@@ -39,7 +39,8 @@ export default function App() {
   const [busy, setBusy] = useState(false)
 
   // races available for the active election (from the ballot manifest)
-  const races = electionsList.find((e) => e.id === election)?.races || []
+  const currentElection = electionsList.find((e) => e.id === election)
+  const races = currentElection?.races || []
 
   // load the election manifest + the full (election-independent) state roster once
   useEffect(() => {
@@ -158,9 +159,14 @@ export default function App() {
           precinct-by-precinct — they only make sense for head-to-head races.
           Primary showcases (MI, GA Governor) are populated from real ingested
           data with no baseline to replay, so "Next Batch" would have nothing
-          to reveal — hiding this avoids implying a control that can't do
-          anything for these races. */}
-      {!PRIMARY_RACES.has(race) && (
+          to reveal. "Real" elections (general2026, general2028) are populated
+          by the production poller writing directly to results_live — clicking
+          Reset here wouldn't just do nothing, it would actively DELETE that
+          real data (the simulator's reset() clears results_live scoped only
+          by race_type + state, not by election, and general2026's states
+          overlap Demo's), so this is hidden there for data safety, not just
+          because it'd be confusing. */}
+      {!PRIMARY_RACES.has(race) && !currentElection?.real && (
         <SimControls scenarios={scenarios} scenario={scenario} onScenario={onScenario}
                      sim={sim} onNext={onNext} onReset={onReset} busy={busy} />
       )}
