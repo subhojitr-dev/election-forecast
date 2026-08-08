@@ -40,8 +40,8 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
-import urllib.request
 
+import httpx
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +49,10 @@ ROOT = os.path.dirname(HERE)
 CSV = os.path.join(ROOT, "data", "raw", "2020-SENATE-precinct-general.csv")
 DB = os.path.join(ROOT, "data", "db", "baseline.db")
 DATAVERSE_FILE_URL = "https://dataverse.harvard.edu/api/access/datafile/6100391"
+# Dataverse 403s a bare/default urllib User-Agent (confirmed 2026-08-08) — see
+# etl_governor_2022.py's UA constant for the same fix, same root cause.
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
 
 PARTY_MAP = {"DEMOCRAT": "DEM", "REPUBLICAN": "REP", "LIBERTARIAN": "LIB", "GREEN": "GRE"}
 STAT_CANDIDATES = {"UNDERVOTES", "OVERVOTES", "WRITEIN", "WRITE-IN", "BLANK", "TOTAL VOTES"}
@@ -59,7 +63,12 @@ def _ensure_downloaded():
         return CSV
     os.makedirs(os.path.dirname(CSV), exist_ok=True)
     print(f"  downloading 2020-SENATE-precinct-general.csv from {DATAVERSE_FILE_URL} ...")
-    urllib.request.urlretrieve(DATAVERSE_FILE_URL, CSV)
+    with httpx.stream("GET", DATAVERSE_FILE_URL, headers={"User-Agent": UA},
+                       follow_redirects=True, timeout=120) as r:
+        r.raise_for_status()
+        with open(CSV, "wb") as f:
+            for chunk in r.iter_bytes(chunk_size=1 << 20):
+                f.write(chunk)
     print(f"  ready ({os.path.getsize(CSV):,} bytes)")
     return CSV
 

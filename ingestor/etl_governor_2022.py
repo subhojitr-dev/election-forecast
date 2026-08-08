@@ -38,8 +38,8 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
-import urllib.request
 
+import httpx
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +47,12 @@ ROOT = os.path.dirname(HERE)
 RAW = os.path.join(ROOT, "data", "raw", "gov2022")
 DB = os.path.join(ROOT, "data", "db", "baseline.db")
 DATAVERSE_FILE_URL = "https://dataverse.harvard.edu/api/access/datafile/{id}"
+# Dataverse 403s a bare/default urllib User-Agent (confirmed 2026-08-08 — same
+# CloudFront-style bot check already seen on MI's Clarity endpoints, see
+# mi_clarity_feed.py). A real browser UA + httpx works fine, no other
+# mitigation needed.
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
 
 # (local filename, Dataverse file id)
 FILES = {
@@ -63,7 +69,12 @@ def _ensure_downloaded(filename, file_id):
     os.makedirs(RAW, exist_ok=True)
     url = DATAVERSE_FILE_URL.format(id=file_id)
     print(f"  downloading {filename} from {url} ...")
-    urllib.request.urlretrieve(url, path)
+    with httpx.stream("GET", url, headers={"User-Agent": UA}, follow_redirects=True,
+                       timeout=120) as r:
+        r.raise_for_status()
+        with open(path, "wb") as f:
+            for chunk in r.iter_bytes(chunk_size=1 << 20):
+                f.write(chunk)
     print(f"  {filename} ready ({os.path.getsize(path):,} bytes)")
     return path
 
