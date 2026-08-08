@@ -83,6 +83,7 @@ header.topbar .dot { color: #2ec27e; }
 .toggle { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .toggle button { background: transparent; color: var(--muted); border: 0; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 600; }
 .toggle button.on { background: var(--panel-2); color: var(--text); }
+.toggle button:disabled { opacity: .35; cursor: not-allowed; }
 .search { flex: 1; min-width: 180px; }
 .search input { width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text);
   border-radius: 8px; padding: 8px 12px; font-size: 13px; }

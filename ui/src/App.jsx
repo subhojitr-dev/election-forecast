@@ -174,7 +174,7 @@ export default function App() {
                 {electionsList.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
               </select>
             </div>
-            <RaceToggle races={races} race={race} onChange={onRaceChange} />
+            <RaceToggle races={races} race={race} onChange={onRaceChange} selected={selected} />
             <div className="search">
               <input placeholder="Search a county…" value={search}
                      onChange={(e) => setSearch(e.target.value)} />
