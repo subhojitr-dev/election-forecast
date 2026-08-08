@@ -154,8 +154,16 @@ export default function App() {
       <SwingStateStrip allStates={allStates} activeStates={statesData?.states}
                        selected={selected} onSelect={onSelectState} />
 
-      <SimControls scenarios={scenarios} scenario={scenario} onScenario={onScenario}
-                   sim={sim} onNext={onNext} onReset={onReset} busy={busy} />
+      {/* Sim controls (Reset/Next Batch/Scenario) replay a historical baseline
+          precinct-by-precinct — they only make sense for head-to-head races.
+          Primary showcases (MI, GA Governor) are populated from real ingested
+          data with no baseline to replay, so "Next Batch" would have nothing
+          to reveal — hiding this avoids implying a control that can't do
+          anything for these races. */}
+      {!PRIMARY_RACES.has(race) && (
+        <SimControls scenarios={scenarios} scenario={scenario} onScenario={onScenario}
+                     sim={sim} onNext={onNext} onReset={onReset} busy={busy} />
+      )}
 
       <div className="main">
         <div className="left">
