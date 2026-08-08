@@ -65,13 +65,13 @@ ELECTIONS = {
         "label": "General · Nov 3, 2026 (midterm)",
         "date": "2026-11-03",
         # No presidential race in 2026. Senate = Class-2 seats only.
-        "races": {"senate": ["GA", "MI", "NC", "TX", "SC"],
+        "races": {"senate": ["GA", "MI", "NC", "TX", "SC", "ME"],
                   # Governor: GA/AZ/TX all last contested 2022 (Kemp/Hobbs/Abbott's
                   # terms all end 2026). Live feeds TBD — same as the Senate slots
                   # above, real electionIds aren't knowable until ~2 weeks out.
                   "governor": ["GA", "AZ", "TX"]},
         # Each seat's baseline = the last time IT was contested (2020; GA = 2021 runoff).
-        "senate_baseline": {"GA": 2021, "MI": 2020, "NC": 2020, "TX": 2020, "SC": 2020},
+        "senate_baseline": {"GA": 2021, "MI": 2020, "NC": 2020, "TX": 2020, "SC": 2020, "ME": 2020},
         "governor_baseline": {"GA": 2022, "AZ": 2022, "TX": 2022},
         # Real 2026 nominees (primaries decided Mar–Jul 2026; MI primary is Aug 4).
         "candidates": {"senate": {
@@ -82,6 +82,10 @@ ELECTIONS = {
             # SC primary was 2026-06-12 (enr-scvotes.org, electionId 126294):
             # Graham (R, incumbent) 56.78%/264,091 beat Mark Lynch; Andrews (D) 61.53%/226,075.
             "SC": {"dem": "ANNIE ANDREWS", "rep": "LINDSEY GRAHAM"},
+            # ME: Collins (incumbent, running for a 6th term) vs Troy Jackson, who
+            # replaced original primary winner Graham Platner after he withdrew
+            # (sexual-assault allegation, denied) in July 2026.
+            "ME": {"dem": "TROY JACKSON", "rep": "SUSAN COLLINS"},
         }, "governor": {
             # GA: Bottoms won the Dem field outright May 19; Jackson beat Jones in
             # the June 16 GOP runoff (see ga_gov_primary_2026_test entry below for

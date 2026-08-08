@@ -54,6 +54,7 @@ sys.path.insert(0, HERE)
 
 import az_live_feed
 import etl_governor_2022
+import etl_me_baseline
 import ga_gov_primary_feed
 import ga_live_feed
 import mi_bay_feed
@@ -373,6 +374,17 @@ def _governor_2022_baseline_seed():
         return None
 
 
+def _me_baseline_seed():
+    # Maine 2020 Senate baseline (see etl_me_baseline.py) — same one-time
+    # self-healing shape as the Governor seed above.
+    try:
+        etl_me_baseline.main()
+        return {"seeded": True}
+    except Exception as e:
+        log(f"    ME 2020 baseline: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
     """Despite the name (kept as-is since it matches Render's currently-set
     POLLER_MODE=mi-primary env var — renaming would require a manual dashboard
@@ -409,6 +421,9 @@ def build_mi_primary_tasks() -> list[PollTask]:
         # fresh production DB, then already_seeded() makes every run after
         # that an instant no-op.
         PollTask("Governor 2022 baseline seed (GA/AZ/TX)", 21600, _governor_2022_baseline_seed),
+        # Downloads a 164MB national file on first run only (no per-state
+        # version exists for this dataset — see etl_me_baseline.py).
+        PollTask("Maine 2020 Senate baseline seed", 21600, _me_baseline_seed),
     ]
 
 

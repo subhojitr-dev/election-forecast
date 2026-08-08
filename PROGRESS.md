@@ -5,6 +5,67 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-08 — GA Governor primary showcase, GA/AZ/TX Governor 2026, Maine added as a new state
+
+Three separate additions, in the order the user asked for (cheapest/most-reusable first):
+
+**① GA Governor primary showcase.** GA's real May 19, 2026 Governor primary (already
+decided/certified) pulled via a new `ga_gov_primary_feed.py`, reusing GA's proven
+Enhanced Voting county-fetch pattern from `ga_live_feed.py`. Real gotcha: Governor is
+**two separate contests per county** ("Governor - Dem" / "Governor - Rep"), not one
+combined contest with a party suffix on each name like the Senate general — a plain
+reuse of `ga_live_feed.ingest()` would have silently dropped one party's whole field.
+Generalized `PrimaryLeaderboard.jsx` (was hardcoded to MI's Democratic-only shape) to
+show whichever parties are actually present. Verified against real reporting: Bottoms
+led the Dem field decisively (551,689 votes), Jones/Jackson split the GOP field closely
+enough to trigger the real June 16 runoff (Jones 341,919 / Jackson 287,996, both well
+under 50%) — matches what actually happened. New manifest entry
+`ga_gov_primary_2026_test`.
+
+**② GA/AZ/TX Governor 2026 general.** All three last elected their Governor in 2022
+(Kemp/Hobbs/Abbott), same "last time this class was contested" logic already used for
+Senate baselines — added `governor` as a full race type. Source: MEDSL's per-state 2022
+"State Offices" Dataverse files (already had GA/AZ/TX's `{ST}-fips-CTY` precincts from
+the existing Senate/President baselines, so no new precinct rows needed, straight
+county-level insert). **Real data-quality bug caught and fixed**: these files include a
+redundant `mode='TOTAL'` row *in addition to* granular per-mode rows (Advanced/Election
+Day/Absentee/Provisional/...) for the same precinct — GA does this for essentially every
+precinct, AZ for a subset, TX never. Naively summing every row double-counted GA's
+totals by almost exactly 2x (Kemp 4.2M vs certified 2.1M) before this was caught via a
+sanity check against real 2022 results and fixed (prefer TOTAL exclusively per precinct
+when present). After the fix, all three states match certified 2022 totals almost
+exactly (GA Kemp 2,111,572 — exact match to certified; AZ/TX within rounding). Real 2026
+nominees wired in: Bottoms/Jackson (GA), Hobbs/Biggs (AZ), Hinojosa/Abbott (TX) — found
+via web search, all three states' primaries/runoffs already resolved by today.
+
+**③ Maine added as a new state** (Senate 2026 — Collins vs Jackson). Turned out to be
+much cheaper than expected: Maine was **already present** in the 2020 Senate CSV this
+project has used from day one (`data/raw/2020-SENATE-precinct-general.csv`), just
+filtered out by `etl_baseline.py`'s 8-state restriction — no new download needed. Built
+`etl_me_baseline.py` (additive, doesn't touch `etl_baseline.py`'s destructive
+wipe-and-rebuild) to load ME's 16 counties + a "STATEWIDE UOCAVA" (military/overseas
+absentee) pseudo-county at county level. Confirmed Maine's file reports first-choice
+RCV totals only (no elimination-round duplication risk) via inspection — validated
+against real certified 2020 results almost exactly (Collins 51.00% vs certified 50.98%,
+Gideon 42.40% vs certified 42.39%). Real 2026 nominee found via search: Troy Jackson (D)
+replaced original primary winner Graham Platner in July 2026 after Platner withdrew
+following a denied sexual-assault allegation; faces Collins (R, 6th-term bid).
+
+**Live-readiness for Maine is UNRESOLVED, flagged honestly rather than guessed at** —
+checked `maine.gov`'s official results page directly: it publishes static Excel/PDF
+exports per contest (RCV summaries, cast vote records), not a live county-by-county API
+like GA/NC/AZ/SC. No ME election happened during this project to test against firsthand
+(Collins has no primary opponent; Jackson was chosen by party delegates, not a primary
+vote). Added to FEED_AUDIT.md's cadence table as ⚠️ UNRESOLVED, likely closer to WI's
+"hardest" category — real research needed before Nov 3, not reactively.
+
+All three additions verified locally (API responses + live browser check of the actual
+dashboard, not just DB queries) before being wired into the UI. Governor's Nov 2026
+live feeds and Maine's live feed are both TBD placeholders for now — same status as
+MI/NC/TX/SC's Senate slots were before their primaries forced real research.
+
+---
+
 ## 2026-08-05 (afternoon) — 3 more MI counties (Eaton, Bay, Midland) — 18 total, ~77-80% coverage
 
 Went straight to each county's own official elections page (same method that's worked
