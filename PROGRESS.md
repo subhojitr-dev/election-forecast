@@ -5,6 +5,86 @@ See `HANDOVER_BRIEF.md` for full project context.
 
 ---
 
+## 2026-08-08 (later) — production seeding debugging saga; 4 real UX/data-safety fixes
+
+Three genuinely different root causes chased in sequence trying to get Governor/Maine
+data to land in production — worth recording precisely since two of the three theories
+were wrong before landing on the real fix, and the debugging PATH is the reusable
+lesson, not just the final answer:
+
+1. **First theory (wrong): OOM crash**, by analogy to the real MI headed-browser memory
+   incident earlier this session. Switched both loaders from a single full-file
+   `pd.read_csv(..., low_memory=False)` to 200k-row chunked reads (same pattern
+   `etl_baseline.py` already uses) so memory stays bounded regardless of file size.
+   Genuinely a good robustness improvement, kept — but NOT what was actually broken.
+2. **Real cause #1 (confirmed via Render's own logs, user checked the dashboard):
+   `HTTPError: HTTP Error 403: Forbidden`.** Dataverse blocks a bare/default Python
+   User-Agent — the exact same CloudFront-style bot check already hit once with MI's
+   Clarity endpoints. Reproduced locally (bare urllib → 403, httpx + a real Chrome UA →
+   200) before fixing. Switched both downloads to `httpx.stream()` with a browser UA,
+   written to disk in chunks. Fixed Governor's 3 files completely (GA/AZ/TX all landed,
+   159/15/254 counties confirmed live).
+3. **Real cause #2 (Maine only, different problem): a Dataverse "Guestbook" gate.**
+   `HTTPStatusError: 400 Bad Request` — `"You may not download this file without the
+   required Guestbook response for guestbookID 458."` A genuine one-time human-form
+   requirement some Dataverse datasets have, not bot detection — no header trick can
+   bypass it. Since Maine's actual needed slice is tiny (68 rows) and a fixed historical
+   fact, sidestepped the whole problem: exported the already-verified county results
+   into a small ~9KB JSON fixture committed to git, rewrote `etl_me_baseline.py` to
+   load from that directly — no download, no external dependency at all for Maine
+   anymore. Confirmed live in production (17 counties, exact match to local numbers).
+
+**4 real product fixes found while explaining the dashboard to the user (not bugs
+found by testing — found by walking through "why does this look wrong" together):**
+
+- **"Next Batch" did nothing on the GA Governor primary showcase.** Root cause: that
+  button drives the SIMULATOR, which replays a historical baseline precinct-by-precinct
+  — primary showcases have no baseline (real ingested data, not a replay), so there was
+  nothing for it to reveal. Fixed by hiding Reset/Next Batch/Scenario entirely for any
+  race in `PRIMARY_RACES` (App.jsx) — not a broken button, a control that was never
+  applicable there.
+- **The "GA Special" race toggle wasn't labeled clearly.** User correctly has this
+  already existed (the Jan-2021 Warnock vs Loeffler runoff) but didn't realize it since
+  the label didn't say whose race it was. Relabeled to "GA Special (Warnock)" — fixed
+  in `api/elections.py`'s `RACE_LABEL` (the actual source of truth; a first attempt to
+  fix this only in `RaceToggle.jsx`'s local fallback did nothing, since the backend-
+  provided label always wins there).
+- **That same GA-only toggle stayed clickable/full-brightness while viewing any other
+  state**, implying it applied to whichever state was selected. Now genuinely disabled
+  (not just dimmed) unless GA is the currently-selected state, with a tooltip
+  explaining why.
+- **Real data-safety bug, found while explaining how Nov 3 will work, not by testing:**
+  the simulator's `reset()` deletes+rewrites `results_live` scoped only by
+  `(race_type, state)` — NOT by which election is active. `general2026`'s real Senate
+  states (GA/MI/NC/TX/SC/ME) overlap Demo's Senate states and share the exact same
+  `race_type="senate"` string. That means clicking Reset/Next Batch on ANY election's
+  Senate race — including just browsing Demo mode out of curiosity — would delete and
+  overwrite the SAME rows the real Nov 3 data lives in. Added a `"real": True` flag to
+  `general2026`/`general2028` in the manifest, exposed via `/api/elections`, and hidden
+  SimControls whenever the active election has it set. Does not fix the underlying
+  `results_live` scoping gap at the API level (a real fix needs a per-election column —
+  bigger, separate change) but eliminates the realistic accidental-click path through
+  the UI, which is what actually mattered here.
+
+**Also clarified for the user (documented here since it came up as real confusion,
+worth remembering for future dashboard walkthroughs):**
+- The Win Probability gauge is built from real historical baseline results, never
+  polling data — this project has no polling data anywhere in it.
+- "Compared to when" for the County Shift chart depends entirely on which
+  Election/Scenario is active — Demo's "True" scenario for President happens to show a
+  genuine 2020-vs-2024 real comparison, but every Test/Demo Senate replay is
+  self-referential (baseline year == replay year, by design, to validate the
+  convergence math) — there is currently NO dropdown option that shows a live
+  2020-vs-2024 real comparison for Senate. Real GA county-level 2020→2024 President
+  shifts, verified directly against the DB, top out around ±5 points (Webster -5.3,
+  Henry +4.6) — nothing close to the ~40-point swings visible in a PARTIALLY-reported
+  county's live number, which is a real, expected artifact of an early, unrepresentative
+  sample of precincts, not a real swing (shrinks back down as more of that county reports).
+- Live D% numbers genuinely fluctuate over the course of real election night, not just
+  the % of votes counted — different ballot types (mail/early/Election-Day/provisional)
+  lean differently by party and get counted in different orders by state/county, which
+  is exactly what the ballot-type breakdown in the County Insight panel is for.
+
 ## 2026-08-08 — GA Governor primary showcase, GA/AZ/TX Governor 2026, Maine added as a new state
 
 Three separate additions, in the order the user asked for (cheapest/most-reusable first):

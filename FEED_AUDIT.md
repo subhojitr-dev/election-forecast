@@ -113,6 +113,19 @@ documentation).
 | **TX** | Retrospective, TX's own March 3, 2026 primary (same day as NC): confirmed a **real, documented mess** ("2026 primary elections start off with a Texas-sized mess" — Votebeat) — hand-count delays in Gillespie/Eastland counties (counting into the early-morning hours), and large counties (Harris/Dallas/Tarrant) acknowledged as slower to report. BUT an early-voting batch does post shortly after polls close (a real partial signal, unlike MI's total silence), and the Senate outcome was determined without needing a next-day wait. | 🟠 **Moderate risk, bounded.** Better than MI (gets an immediate partial signal, resolves same night/next morning), worse than NC/GA/SC (real documented delays for specific counties/races). Worth extra attention in the Nov 3 dry run, and possibly a county-level fallback plan for TX's biggest counties too, not just MI's. |
 | **ME** | *(new state, added 2026-08-08 for the Collins–Jackson Senate race)* Checked `maine.gov`'s official Election Results/Data page directly — it publishes **static Excel/PDF exports** (RCV Central Count summaries, Cast Vote Records) per contest, not a live JSON/API county-by-county feed like GA/NC/AZ/SC. No evidence of a real-time system found. Not yet tested against a real ME election night — no ME primary happened during this project to validate against (Collins faces no primary; Jackson was selected by party delegates in July, not a primary). | ⚠️ **UNRESOLVED — likely closer to WI's "hardest" category than MI's (county fallback exists) or SC's (proven).** Baseline data is loaded and the UI is wired, but there is no confirmed live-data mechanism yet. Needs real research before Nov 3 — check for a county-clerk-level fallback (same playbook that worked for MI) well before election night, not reactively. |
 
+### Governor race (GA/AZ/TX, added 2026-08-08) — live feed status: NOT YET RESEARCHED
+
+The `governor` race type was added with a full 2022 historical baseline (see
+PROGRESS.md 2026-08-08), but **no live-feed discovery work has been done for the real
+Nov 2026 Governor races yet** — same TBD status Senate's GA/NC/TX/SC slots were in
+before their primaries forced real research. Best guess, not yet verified:
+- **GA**: likely trivial — Governor already proven to be on the same Enhanced Voting
+  system as Senate/the primary showcase (`ga_gov_primary_2026_test` used this exact
+  mechanism), just a different contest name once a real electionId exists.
+- **AZ/TX**: unverified whether Governor rides the same already-proven Senate/
+  President systems (`az_live_feed.py`/`tx_live_feed.py`) or needs separate discovery
+  — check, don't assume, before Nov 3.
+
 ### MI county-level detail (found 2026-08-04/05, 18 counties wired as of afternoon 08-05)
 
 The state system is dead, but individual counties are not — and it's not 18 unrelated

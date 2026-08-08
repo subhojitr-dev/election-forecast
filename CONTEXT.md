@@ -1,17 +1,23 @@
 # CONTEXT.md — START HERE EACH SESSION
 # Election Forecast Dashboard — current-state snapshot
-# Last updated: 2026-07-18 (7 states WIRED END-TO-END, all validated + LIVE ON PRODUCTION
-#                           (db-v3, deployed); found+fixed a real data bug (MI/TX's 2020
-#                           Senate baseline was never county-converted, NC's live data had
-#                           been emptied by testing) — all 5 general2026 states now
-#                           consistent; built production_poller.py (the real election-night
-#                           scheduler) + Dockerfile Xvfb/Chromium for MI; Render UPGRADED TO
-#                           STARTER + 1GB persistent disk (/app/data/db); poller wired into
-#                           entrypoint.sh but OFF (ENABLE_POLLER unset) — turn on ~Aug 2-3
-#                           for the Aug 4 MI primary. See "🗓️ SCHEDULE" below.)
+# Last updated: 2026-08-08 — ⚠️ THIS FILE'S BODY IS STALE (last fully rewritten 2026-07-18,
+#                           before the Aug 4/5 MI county saga and this session's GA
+#                           primary/Governor/Maine work). For the actual current state,
+#                           read NEXT_SESSION_PROMPT.md instead — it's kept accurate every
+#                           session; this file's detailed sections below are historical
+#                           narrative, still useful for HOW things were built, just not a
+#                           reliable CURRENT-status source. Headline since Jul 18: MI county
+#                           fallback now 18 counties (~77-80%, not the original 4); GA
+#                           Governor primary showcase + GA/AZ/TX Governor 2026 + Maine (10th
+#                           state) all added and live; 4 UX/data-safety fixes shipped
+#                           (notably: the simulator can no longer accidentally overwrite
+#                           real election-night data). Full detail: PROGRESS.md's
+#                           2026-08-08 entries, NEXT_SESSION_PROMPT.md.
 
 > This is the fast on-ramp. Read this first, then `HANDOVER_BRIEF.md` for the
 > full spec. `PROGRESS.md` = chronological log. `Issues.md` = problems + plans.
+> **For the actual current TODO list, read `NEXT_SESSION_PROMPT.md` — more current
+> than this file's body.**
 
 ---
 
