@@ -28,7 +28,7 @@ export default function CountyTable({ detail, search, onSelectCounty, selectedCo
               <Th k="county">County</Th>
               <Th k="pct_reporting">% Rep.</Th>
               <Th k="dem_share_live">D% Live</Th>
-              <Th k="dem_share_2020">D% 2020</Th>
+              <Th k="dem_share_2020">D% {detail?.baseline_year ?? '2020'}</Th>
               <Th k="shift">vs Bench</Th>
               <Th k="turnout_vs_2020">Turn v20</Th>
               <Th k="pending_extrapolated">Pending</Th>

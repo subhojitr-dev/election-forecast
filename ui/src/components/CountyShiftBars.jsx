@@ -12,7 +12,7 @@ export default function CountyShiftBars({ detail }) {
 
   return (
     <div className="panel">
-      <h2>County Shift vs 2020 (largest movers)</h2>
+      <h2>County Shift vs {detail?.baseline_year ?? '2020'} (largest movers)</h2>
       {data.length === 0 ? (
         <div className="empty">No counties reporting yet.</div>
       ) : (

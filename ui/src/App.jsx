@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { getElections, getStates, getStateDetail, getCandidates, getScenarios, simReset, simNext, simStatus } from './api'
+import { getElections, getStates, getAllStates, getStateDetail, getCandidates, getScenarios, simReset, simNext, simStatus } from './api'
 import SwingStateStrip from './components/SwingStateStrip'
 import RaceToggle from './components/RaceToggle'
 import SimControls from './components/SimControls'
@@ -21,6 +21,7 @@ const POLL_MS = 10000
 
 export default function App() {
   const [electionsList, setElectionsList] = useState([])
+  const [allStates, setAllStates] = useState([])
   const [election, setElection] = useState('demo')
   const [race, setRace] = useState('president')
   const [statesData, setStatesData] = useState(null)
@@ -40,7 +41,7 @@ export default function App() {
   // races available for the active election (from the ballot manifest)
   const races = electionsList.find((e) => e.id === election)?.races || []
 
-  // load the election manifest once
+  // load the election manifest + the full (election-independent) state roster once
   useEffect(() => {
     (async () => {
       try {
@@ -50,6 +51,9 @@ export default function App() {
         setElection(def)
         const defRaces = data.elections.find((e) => e.id === def)?.races || []
         if (defRaces.length) setRace(defRaces[0].id)
+      } catch { /* ignore */ }
+      try {
+        setAllStates((await getAllStates()).states)
       } catch { /* ignore */ }
     })()
   }, [])
@@ -124,11 +128,15 @@ export default function App() {
   }
   const onSelectState = (s) => { setSelected(s); setSelectedCounty(null) }
 
-  // switching elections re-points the race toggle to that election's races
+  // switching elections re-points the race toggle to that election's races.
+  // `selected` is deliberately left alone here — GA isn't on every election's
+  // ballot (e.g. the 2024 Senate replay doesn't include it), so forcing it
+  // caused a flash to an invalid state before the safety-net effect above
+  // corrected it. Leaving `selected` as-is lets that same effect snap it to
+  // a valid state directly, with no incorrect intermediate flash.
   const onElectionChange = (eid) => {
     const eRaces = electionsList.find((e) => e.id === eid)?.races || []
     setElection(eid)
-    setSelected('GA')          // GA is on the ballot in every configured election
     setSelectedCounty(null)
     if (eRaces.length) setRace(eRaces[0].id)
   }
@@ -143,7 +151,8 @@ export default function App() {
 
       {error && <div className="err">API error: {error} — is the backend running on :8000?</div>}
 
-      <SwingStateStrip states={statesData?.states} selected={selected} onSelect={onSelectState} />
+      <SwingStateStrip allStates={allStates} activeStates={statesData?.states}
+                       selected={selected} onSelect={onSelectState} />
 
       <SimControls scenarios={scenarios} scenario={scenario} onScenario={onScenario}
                    sim={sim} onNext={onNext} onReset={onReset} busy={busy} />

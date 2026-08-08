@@ -137,6 +137,7 @@ def _states_payload(race: str, election: str = DEFAULT_ELECTION) -> dict:
                 rows.append(_summary(b))
             else:
                 rows.append(_summary_from_snapshot(snap, st, race))
+            rows[-1]["baseline_year"] = baseline_for(st, race, election)
     finally:
         conn.close()
     ev_dem = sum(r["ev"] for r in rows if (r["win_prob_dem"] or 0) >= 0.5)
@@ -178,6 +179,16 @@ def list_elections():
     """The ballot manifest: which elections exist + which races each one has.
     The UI builds its Election dropdown + race toggle from this."""
     return {"elections": elections.listing(), "default": DEFAULT_ELECTION}
+
+
+@app.get("/api/states/all")
+def all_states():
+    """Every state this project has any data for, regardless of which election
+    is currently selected. Static (name + EV only, no live numbers) — powers
+    the swing-state strip's grayed-out placeholders for states not on the
+    CURRENT election's ballot, so the row of cards stays visually stable
+    across election switches instead of states popping in/out."""
+    return {"states": [{"state": s, "name": STATE_NAMES.get(s, s), "ev": EV.get(s)} for s in STATES]}
 
 
 @app.get("/api/scenarios")
@@ -261,6 +272,7 @@ def state_detail(abbr: str, response: Response, race: str = Query("president"),
     b["ev"] = EV.get(abbr)
     b["series"] = series
     b["modes"] = modes
+    b["baseline_year"] = baseline_for(abbr, race, election)
     return b
 
 
