@@ -164,6 +164,10 @@ SCENARIOS = {
         "true": {"name": "True (most-recent real results)", "swing": 0.0, "noise": 0.0},
         "dems_plus5": {"name": "Democrats D+5 (real candidates)", "swing": 0.05, "noise": 0.02},
     },
+    "governor": {
+        "true": {"name": "True (most-recent real results)", "swing": 0.0, "noise": 0.0},
+        "dems_plus5": {"name": "Democrats D+5 (real candidates)", "swing": 0.05, "noise": 0.02},
+    },
     # GA-only special seat — the Jan-2021 Warnock vs Loeffler runoff.
     "senate_special": {
         "true": {"name": "True (2021 GA runoff · Warnock)", "swing": 0.0, "noise": 0.0},

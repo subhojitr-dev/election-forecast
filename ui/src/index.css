@@ -95,6 +95,8 @@ header.topbar .dot { color: #2ec27e; }
 .big { font-size: 22px; font-weight: 700; }
 
 /* ---- primary leaderboard ---- */
+.primary-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.primary-field h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .02em; }
 .primary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .primary-list li { display: flex; justify-content: space-between; align-items: baseline;
   background: var(--panel-2); border-radius: 6px; padding: 6px 10px; font-size: 13px; }

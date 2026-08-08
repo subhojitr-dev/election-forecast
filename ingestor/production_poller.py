@@ -53,6 +53,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import az_live_feed
+import etl_governor_2022
+import ga_gov_primary_feed
 import ga_live_feed
 import mi_bay_feed
 import mi_calhoun_feed
@@ -346,7 +348,39 @@ def _mi_pdf_poll():
     return {"counties": [r["county"] for r in results]} if results else None
 
 
+def _ga_gov_primary_poll():
+    # GA's May 19, 2026 Governor primary is already decided/certified — this
+    # data will never change. Re-fetched only occasionally (see the task's
+    # long interval below) purely to self-heal if results_live ever gets
+    # cleared, not because anything is actually "live" here.
+    try:
+        return ga_gov_primary_feed.ingest()
+    except Exception as e:
+        log(f"    GA Governor primary: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
+def _governor_2022_baseline_seed():
+    # GA/AZ/TX Governor 2022 baseline (see etl_governor_2022.py) — a one-time
+    # historical seed, not a live feed. already_seeded() makes this a no-op on
+    # every run after the first, so the long interval below only matters for
+    # the very first successful run after a fresh/empty production DB.
+    try:
+        etl_governor_2022.main()
+        return {"seeded": True}
+    except Exception as e:
+        log(f"    Governor 2022 baseline: FAILED — {type(e).__name__}: {e}")
+        return None
+
+
 def build_mi_primary_tasks() -> list[PollTask]:
+    """Despite the name (kept as-is since it matches Render's currently-set
+    POLLER_MODE=mi-primary env var — renaming would require a manual dashboard
+    change), this is really "the currently-active production task list."
+    ga_gov_primary_2026 rides along here for that reason, not because it's
+    conceptually an MI task — it's a one-off historical showcase (see
+    _ga_gov_primary_poll's docstring), added here simply because this is the
+    list actually running in production right now."""
     return [
         # DISABLED 2026-08-05: confirmed dead (0-byte results file, 11+ hrs
         # post-close — see PROGRESS.md 2026-08-05) AND very likely the cause of
@@ -365,6 +399,16 @@ def build_mi_primary_tasks() -> list[PollTask]:
         PollTask("MI primary — Calhoun", 90, _mi_calhoun_poll),
         PollTask("MI primary — Bay", 90, _mi_bay_poll),
         PollTask("MI primary — PDF counties", 90, _mi_pdf_poll),
+        # 6h interval, not 90s — see _ga_gov_primary_poll's docstring: this data
+        # is certified/final and will never change, so this only exists to
+        # self-heal, not to track anything actually live.
+        PollTask("GA Governor primary (5/19/2026, showcase)", 21600, _ga_gov_primary_poll),
+        # Same self-healing long-interval shape as above — a real one-time
+        # historical seed (GA/AZ/TX 2022 Governor), not a live feed. Downloads
+        # ~340MB from Dataverse on its very first successful run against a
+        # fresh production DB, then already_seeded() makes every run after
+        # that an instant no-op.
+        PollTask("Governor 2022 baseline seed (GA/AZ/TX)", 21600, _governor_2022_baseline_seed),
     ]
 
 

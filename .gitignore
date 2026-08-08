@@ -1,5 +1,6 @@
 # --- Large / regenerable DATA (1.4 GB) — never commit; see DATA_SETUP.md to obtain ---
 *.csv
+*.tab
 data/db/
 *.db
 *.db-wal

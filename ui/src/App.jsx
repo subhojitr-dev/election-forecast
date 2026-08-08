@@ -15,7 +15,7 @@ import PrimaryLeaderboard from './components/PrimaryLeaderboard'
 
 // Races that are an actual primary (intra-party contest), not a D-vs-R general —
 // these get the PrimaryLeaderboard instead of/alongside the head-to-head panels.
-const PRIMARY_RACES = new Set(['mi_primary_2026'])
+const PRIMARY_RACES = new Set(['mi_primary_2026', 'ga_gov_primary_2026'])
 
 const POLL_MS = 10000
 
@@ -179,7 +179,8 @@ export default function App() {
           </div>
 
           {PRIMARY_RACES.has(race) ? (
-            <PrimaryLeaderboard candidates={candidates} />
+            <PrimaryLeaderboard candidates={candidates}
+                               title={races.find((r) => r.id === race)?.label} />
           ) : (
             <div className="row2">
               <LiveVoteBar detail={detail} />

@@ -19,8 +19,11 @@ from __future__ import annotations
 
 ALL8 = ["GA", "PA", "AZ", "NV", "WI", "MI", "NC", "TX"]
 RACE_LABEL = {"president": "President", "senate": "Senate", "senate_special": "GA Special",
-              "mi_primary_2026": "Michigan Senate Primary — Democratic Field"}
-RACE_ORDER = ["president", "senate", "senate_special", "mi_primary_2026"]
+              "governor": "Governor",
+              "mi_primary_2026": "Michigan Senate Primary — Democratic Field",
+              "ga_gov_primary_2026": "Georgia Governor Primary — Both Fields"}
+RACE_ORDER = ["president", "senate", "senate_special", "governor",
+              "mi_primary_2026", "ga_gov_primary_2026"]
 
 ELECTIONS = {
     "demo": {
@@ -62,10 +65,15 @@ ELECTIONS = {
         "label": "General · Nov 3, 2026 (midterm)",
         "date": "2026-11-03",
         # No presidential race in 2026. Senate = Class-2 seats only.
-        "races": {"senate": ["GA", "MI", "NC", "TX", "SC"]},
+        "races": {"senate": ["GA", "MI", "NC", "TX", "SC"],
+                  # Governor: GA/AZ/TX all last contested 2022 (Kemp/Hobbs/Abbott's
+                  # terms all end 2026). Live feeds TBD — same as the Senate slots
+                  # above, real electionIds aren't knowable until ~2 weeks out.
+                  "governor": ["GA", "AZ", "TX"]},
         # Each seat's baseline = the last time IT was contested (2020; GA = 2021 runoff).
         "senate_baseline": {"GA": 2021, "MI": 2020, "NC": 2020, "TX": 2020, "SC": 2020},
-        # Real 2026 nominees (primaries decided Mar–Jun 2026; MI primary is Aug 4).
+        "governor_baseline": {"GA": 2022, "AZ": 2022, "TX": 2022},
+        # Real 2026 nominees (primaries decided Mar–Jul 2026; MI primary is Aug 4).
         "candidates": {"senate": {
             "GA": {"dem": "JON OSSOFF", "rep": "MIKE COLLINS"},
             "NC": {"dem": "ROY COOPER", "rep": "MICHAEL WHATLEY"},
@@ -74,6 +82,17 @@ ELECTIONS = {
             # SC primary was 2026-06-12 (enr-scvotes.org, electionId 126294):
             # Graham (R, incumbent) 56.78%/264,091 beat Mark Lynch; Andrews (D) 61.53%/226,075.
             "SC": {"dem": "ANNIE ANDREWS", "rep": "LINDSEY GRAHAM"},
+        }, "governor": {
+            # GA: Bottoms won the Dem field outright May 19; Jackson beat Jones in
+            # the June 16 GOP runoff (see ga_gov_primary_2026_test entry below for
+            # the full first-round field both parties ran).
+            "GA": {"dem": "KEISHA LANCE BOTTOMS", "rep": "RICK JACKSON"},
+            # AZ: Hobbs (incumbent) ran unopposed in the Dem primary; Biggs won
+            # the GOP primary July 21, 2026.
+            "AZ": {"dem": "KATIE HOBBS", "rep": "ANDY BIGGS"},
+            # TX: Abbott (incumbent) and Hinojosa both won their March 3, 2026
+            # primaries outright.
+            "TX": {"dem": "GINA HINOJOSA", "rep": "GREG ABBOTT"},
         }},
     },
     # --- LIVE TEST, 2026-08-04: watch tonight's real MI primary on the dashboard.
@@ -91,6 +110,20 @@ ELECTIONS = {
         "label": "LIVE TEST · MI Primary — Aug 4, 2026",
         "date": "2026-08-04",
         "races": {"mi_primary_2026": ["MI"]},
+    },
+    # --- SHOWCASE: GA's real May 19, 2026 Governor primary (both fields — Dem
+    # and Rep are separate contests, unlike a general). Already decided +
+    # certified by the time this was added (2026-08-05), pulled once via
+    # ga_gov_primary_feed.py to prove GA's live-feed plumbing genuinely works
+    # against a real primary night, not just replayed/synthetic data. Same
+    # no-baseline shape as the MI primary entry above — a primary has no prior
+    # election to swing-compare against, only live standings matter here.
+    # GOP field didn't reach 50% (Jones vs Jackson went to a June 16 runoff,
+    # not pulled here — this is the May 19 first round only).
+    "ga_gov_primary_2026_test": {
+        "label": "SHOWCASE · GA Governor Primary — May 19, 2026",
+        "date": "2026-05-19",
+        "races": {"ga_gov_primary_2026": ["GA"]},
     },
     "general2028": {
         "label": "General · Nov 7, 2028 (needs 2022 Senate data)",
@@ -126,6 +159,8 @@ def baseline_year(eid, state, race):
         return e.get("senate_baseline", {}).get(state, 2020)
     if race == "senate_special":
         return e.get("senate_special_baseline", {}).get(state, 2021)
+    if race == "governor":
+        return e.get("governor_baseline", {}).get(state, 2022)
     return 2020
 
 
