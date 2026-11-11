@@ -53,6 +53,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import az_live_feed
+import district_live_feed
 import etl_governor_2022
 import etl_me_baseline
 import ga_gov_primary_feed
@@ -155,6 +156,13 @@ def build_production_tasks() -> list[PollTask]:
         # SC: elections.json is empty between elections — needs a manual
         # electionId + contest-code lookup once it's live (see FEED_AUDIT.md).
         PollTask("SC senate", 60, _tbd("SC senate"), enabled=False),
+        # Districts tab (GA/NC legislature) — on only when the election is set in env:
+        #   DISTRICT_LIVE_GA_EID / DISTRICT_LIVE_NC_DATE (see district_live_feed.py).
+        # GA = ~700 API calls per poll, so a gentler interval than the statewide feed.
+        PollTask("GA districts", 180, district_live_feed.poll_ga,
+                  enabled=bool(os.environ.get("DISTRICT_LIVE_GA_EID"))),
+        PollTask("NC districts", 60, district_live_feed.poll_nc,
+                  enabled=bool(os.environ.get("DISTRICT_LIVE_NC_DATE"))),
     ]
 
 

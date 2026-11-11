@@ -281,6 +281,8 @@ def build(state: str, year: int, prec, exact_sorted=True):
     cands = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))  # (ch,d)->cand->method->v
     unit_leg = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))       # (ch,d)->unit->[D,R,O]
     unit_leg_by = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0, 0])))
+    unit_leg_m = defaultdict(lambda: defaultdict(lambda: [0, 0, 0]))      # (ch,d)->(unit,method)->[D,R,O]
+    top_unit_m = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))    # (ch,d)->(unit,method)->[D,R]
     for county, pct, real, kind, dist, cand, by in prec:
         unit = (county, pct, real)
         n = _total(by)
@@ -296,6 +298,7 @@ def build(state: str, year: int, prec, exact_sorted=True):
             cands[key][cand][m] += v
             if cand[1] in "DR":
                 unit_leg_by[key][unit][m][0 if cand[1] == "D" else 1] += v
+            unit_leg_m[key][(unit, m)]["DRO".index(cand[1])] += v
         unit_leg[key][unit]["DRO".index(cand[1])] += n
 
     # Allocate top-of-ticket votes in each unit to the district(s) voting there.
@@ -339,6 +342,8 @@ def build(state: str, year: int, prec, exact_sorted=True):
                 for m, (vd, vr) in t["by"].items():
                     top_alloc_by[(ch, d)][m][0] += vd * fd
                     top_alloc_by[(ch, d)][m][1] += vr * fr
+                    top_unit_m[(ch, d)][(unit, m)][0] += vd * fd
+                    top_unit_m[(ch, d)][(unit, m)][1] += vr * fr
 
     out = {}
     for key, cs in cands.items():
@@ -384,7 +389,19 @@ def build(state: str, year: int, prec, exact_sorted=True):
                               "td": round(ta[0]), "tr": round(ta[1])})
         precincts.sort(key=lambda p: (p["county"], p["precinct"]))
         est = estimated.get(key, 0)
+        # Baseline units for the election-night tracker: one row per precinct x vote
+        # method (GA: method "all"). [county, precinct, method, D, R, O, topD, topR]
+        units = []
+        for (unit, m_), (d_, r_, o_) in unit_leg_m[key].items():
+            td_, tr_ = top_unit_m[key].get((unit, m_), (0, 0))
+            if d_ + r_ + o_ + round(td_ + tr_):
+                units.append([unit[0], unit[1], m_, d_, r_, o_, round(td_), round(tr_)])
+        for (unit, m_), (td_, tr_) in top_unit_m[key].items():   # top votes with no leg votes
+            if (unit, m_) not in unit_leg_m[key] and round(td_ + tr_):
+                units.append([unit[0], unit[1], m_, 0, 0, 0, round(td_), round(tr_)])
+        units.sort(key=lambda u: (u[0], u[1], u[2]))
         out[key] = {
+            "units": units,
             "cands": clist, "d": D, "r": R, "o": O, "total": D + R + O,
             "contested": contested, "margin": m,
             "top": {"label": TOP_LABEL[year], "d": round(tD), "r": round(tR), "margin": tm},
@@ -443,8 +460,15 @@ def write_state(state: str):
             row["top_swing"] = round(a["top"]["margin"] - b["top"]["margin"], 4) if (a["top"]["margin"] is not None and b["top"]["margin"] is not None) else None
         rows.append(row)
         detail = {"state": state, "chamber": ch, "district": dist,
-                  **{str(y): years[y][key] for y in (2024, 2026) if key in years[y]}}
+                  **{str(y): {k: v for k, v in years[y][key].items() if k != "units"}
+                     for y in (2024, 2026) if key in years[y]}}
         (OUT / state / f"{ch}-{dist}.json").write_text(json.dumps(detail, separators=(",", ":")))
+    # 2026 baseline for the election-night tracker, one file per chamber
+    for ch in ("house", "senate"):
+        base = {str(k[1]): v["units"] for k, v in years[2026].items() if k[0] == ch}
+        (OUT / state / f"baseline-{ch}.json").write_text(json.dumps(
+            {"state": state, "chamber": ch, "year": 2026, "cols": ["county", "precinct", "method", "d", "r", "o", "td", "tr"],
+             "districts": base}, separators=(",", ":")))
     meta = {"state": state, "built": date.today().isoformat(), "notes": notes,
             "sources": ("Georgia Secretary of State results (results.sos.ga.gov), certified"
                         if state == "GA" else "NC State Board of Elections results files (dl.ncsbe.gov)"),

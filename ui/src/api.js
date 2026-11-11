@@ -56,3 +56,12 @@ export async function simStatus(race, election) {
   const r = await fetch(`${API}/api/sim/status?race=${race}&election=${election}`)
   return r.json()
 }
+
+// ---- election-night district tracker (GA/NC legislature) ----
+// Returns null when no live election is configured (404/204) so the UI can say so.
+export async function getDistrictLive(state) {
+  const r = await fetch(`${API}/api/districts/live/${state}`)
+  if (r.status === 404 || r.status === 204) return null
+  if (!r.ok) throw new Error('Live district results unavailable')
+  return r.json()
+}

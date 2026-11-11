@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './districts.css'
+import LiveView from './LiveView.jsx'
 
 // Static data built by ingestor/district_results.py → ui/public/districts/.
 // No backend call: these pages load instantly even when the Render API is asleep.
@@ -53,7 +54,7 @@ export default function Districts({ parts }) {
     load(`${st}.json`).then(setData, (e) => setErr(e.message))
   }, [st])
 
-  const view = parts[1] === 'targets' ? 'targets' : CHAMBERS[parts[1]] && parts[2] ? 'detail' : 'table'
+  const view = parts[1] === 'live' ? 'live' : parts[1] === 'targets' ? 'targets' : CHAMBERS[parts[1]] && parts[2] ? 'detail' : 'table'
 
   return (
     <div className="app districts">
@@ -64,16 +65,18 @@ export default function Districts({ parts }) {
 
       <div className="toolbar dist-nav">
         <Seg value={st} options={{ GA: 'Georgia', NC: 'North Carolina' }}
-             onChange={(s) => { window.location.hash = href(s, ...(view === 'targets' ? ['targets'] : [])) }} />
-        <Seg value={view === 'targets' ? 'targets' : 'table'}
-             options={{ table: 'All districts', targets: '2028 targets' }}
-             onChange={(v) => { window.location.hash = v === 'targets' ? href(st, 'targets') : href(st) }} />
+             onChange={(s) => { window.location.hash = href(s, ...(view === 'targets' || view === 'live' ? [view] : [])) }} />
+        <Seg value={view === 'targets' || view === 'live' ? view : 'table'}
+             options={{ table: '2026 results', targets: '2028 targets', live: 'Election night' }}
+             onChange={(v) => { window.location.hash = v === 'table' ? href(st) : href(st, v) }} />
       </div>
 
       {err && <div className="err">{err}</div>}
       {!data && !err && <div className="panel muted">Loading {STATES[st]}…</div>}
       {data && view === 'table' && <DistrictTable st={st} data={data} />}
       {data && view === 'targets' && <Targets st={st} data={data} />}
+      {data && view === 'live' && <LiveView st={st} chamber={CHAMBERS[parts[2]] ? parts[2] : 'house'}
+                                            district={parts[3] ? +parts[3] : null} summary={data} />}
       {data && view === 'detail' && <Detail st={st} chamber={parts[1]} district={+parts[2]} summary={data} />}
 
       {data && (

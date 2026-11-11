@@ -42,3 +42,30 @@
   .districts header.topbar { flex-direction: column; gap: 4px; }
   .districts .toggle button { padding: 7px 10px; }
 }
+
+/* ---- election night ---- */
+.districts .live-controls { margin-bottom: 14px; }
+.districts .live-controls .sim-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.districts .live-controls select, .districts .live-controls .sim-row > button, .districts .pin-btn {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.districts .live-controls .sim-row > button.primary { background: var(--dem); border-color: var(--dem); color: #fff; }
+.districts .live-controls .sim-row > button:disabled { opacity: .5; cursor: default; }
+.districts .live-controls .prog { margin-left: auto; font-weight: 700; font-size: 14px; }
+.districts .pin-btn.on { border-color: var(--accent); color: var(--accent); }
+.districts .winbar { display: inline-flex; width: 90px; height: 8px; border-radius: 4px; overflow: hidden;
+  background: #333; vertical-align: middle; margin-right: 6px; }
+.districts .card .winbar { width: 100%; margin: 6px 0 2px; }
+.districts .winbar .seg-d { background: var(--dem); } .districts .winbar .seg-r { background: var(--rep); }
+.districts .status { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); }
+.districts .status.call.d { background: var(--dem); color: #fff; border-color: var(--dem); }
+.districts .status.call.r { background: var(--rep); color: #fff; border-color: var(--rep); }
+.districts .status.likely.d, .districts .status.lean.d { border-color: var(--dem); }
+.districts .status.likely.r, .districts .status.lean.r { border-color: var(--rep); }
+.districts .status.tossup { color: var(--accent); border-color: var(--accent); }
+.districts td.star { cursor: pointer; color: var(--muted); font-size: 15px; }
+.districts td.star.on { color: var(--accent); }
+.districts .pins { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.districts .pin-card { text-decoration: none; color: var(--text); border-color: var(--accent); }
+.districts .pin-card .lbl { font-size: 11px; color: var(--accent); font-weight: 700; }
+.districts .votebar .totals { display: flex; justify-content: space-between; margin-top: 6px; }

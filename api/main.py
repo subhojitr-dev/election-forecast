@@ -246,6 +246,22 @@ def health():
     return {"status": "ok", "historical_rows": n, "live_rows": live}
 
 
+@app.get("/api/districts/live/{abbr}")
+def districts_live(abbr: str):
+    """Latest election-night snapshot for the Districts tab (GA/NC legislature),
+    written by ingestor/district_live_feed.py. 404 = no live election configured."""
+    conn = get_conn()
+    try:
+        has = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='district_live'").fetchone()
+        row = conn.execute("SELECT payload FROM district_live WHERE state=?", (abbr.upper(),)).fetchone() if has else None
+    finally:
+        conn.close()
+    if not row:
+        raise HTTPException(404, "No live district results")
+    return Response(content=row["payload"], media_type="application/json",
+                    headers={"Cache-Control": "public, max-age=20"})
+
+
 @app.get("/api/states")
 def states(response: Response, race: str = Query("president"), election: str = Query(DEFAULT_ELECTION)):
     """Panel 1 (swing-state strip) + Panel 10 (EV tracker)."""
