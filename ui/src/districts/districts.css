@@ -69,3 +69,6 @@
 .districts .pin-card { text-decoration: none; color: var(--text); border-color: var(--accent); }
 .districts .pin-card .lbl { font-size: 11px; color: var(--accent); font-weight: 700; }
 .districts .votebar .totals { display: flex; justify-content: space-between; margin-top: 6px; }
+.districts .cand-list { display: flex; flex-direction: column; gap: 3px; }
+.districts .cand { white-space: nowrap; color: var(--muted); }
+.districts .cand.win { color: var(--text); font-weight: 600; }

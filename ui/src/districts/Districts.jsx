@@ -31,6 +31,28 @@ const PARTY = { D: 'Dem', R: 'Rep', O: 'Other' }
 const winner = (y) => y?.cands?.[0]
 const href = (...p) => '#/' + ['districts', ...p].join('/')
 
+// Dem and Rep candidates (plus any other candidate who won or got 5%+), winner first
+// and marked ✓ — so a losing Democrat is named, not just the winner.
+function Candidates({ y }) {
+  const tot = y.total || 1
+  const shown = y.cands.filter((c) => c.party !== 'O' || c.win || c.votes / tot >= 0.05)
+  const pick = []
+  for (const p of ['D', 'R']) { const c = shown.find((x) => x.party === p); if (c) pick.push(c) }
+  for (const c of shown) if (c.party === 'O') pick.push(c)
+  pick.sort((a, b) => b.votes - a.votes)
+  return (
+    <div className="cand-list">
+      {pick.map((c) => (
+        <div key={c.party + c.name} className={c.win ? 'cand win' : 'cand'}>
+          <span className={`pill ${c.party === 'D' ? 'd' : c.party === 'R' ? 'r' : ''}`}>{PARTY[c.party]}</span>{' '}
+          {c.win ? '✓ ' : ''}{c.name}{c.inc ? <span className="muted tiny"> (inc.)</span> : null}
+        </div>
+      ))}
+      {!y.cands.some((c) => c.party === 'D') && <div className="cand muted tiny">No Democrat ran</div>}
+    </div>
+  )
+}
+
 function Seg({ value, options, onChange }) {
   return (
     <div className="toggle">
@@ -181,7 +203,7 @@ function DistrictTable({ st, data }) {
           <thead>
             <tr>
               {th('district', 'District')}
-              <th className="lft">Winner</th>
+              <th className="lft">Candidates</th>
               {th('margin', 'Margin', 'Dem minus Rep, two-party')}
               {th('top', topName, `${TOP_RACE[year]} margin in this district`)}
               {th('edge', 'Edge', `Legislative margin minus ${topName}'s margin`)}
@@ -198,9 +220,8 @@ function DistrictTable({ st, data }) {
                 <tr key={r.district} onClick={() => { window.location.hash = href(st, chamber, r.district) }} className="click">
                   <td><b>{r.district}</b><div className="muted tiny">{y.counties.slice(0, 3).join(', ')}{y.counties.length > 3 ? ` +${y.counties.length - 3}` : ''}</div></td>
                   <td className="lft">
-                    <span className={`pill ${w.party === 'D' ? 'd' : w.party === 'R' ? 'r' : ''}`}>{PARTY[w.party]}</span>{' '}
-                    {w.name}{w.inc ? <span className="muted tiny"> (inc.)</span> : null}
-                    {flipped && <span className="flag">flipped</span>}
+                    <Candidates y={y} />
+                    {flipped && <span className="flag">flipped to {PARTY[w.party]}</span>}
                   </td>
                   <td className={mcls(y.margin)}>{y.contested ? mg(y.margin) : <span className="muted">uncontested</span>}</td>
                   <td className={mcls(y.top.margin)}>{mg(y.top.margin)}</td>
@@ -244,15 +265,15 @@ function Targets({ st, data }) {
       <p className="muted small blurb">{blurb}</p>
       {rows.length ? (
         <table className="dist-table">
-          <thead><tr><th>Seat</th><th className="lft">2026 winner</th><th>Margin</th><th>{topName}</th><th>Edge</th></tr></thead>
+          <thead><tr><th>Seat</th><th className="lft">2026 candidates</th><th>Margin</th><th>{topName}</th><th>Edge</th></tr></thead>
           <tbody>
             {rows.map((r) => {
-              const y = r['2026']; const w = winner(y)
+              const y = r['2026']
               return (
                 <tr key={r.chamber + r.district} className="click"
                     onClick={() => { window.location.hash = href(st, r.chamber, r.district) }}>
                   <td><b>{r.chamber === 'house' ? 'HD' : 'SD'}-{r.district}</b><div className="muted tiny">{y.counties.slice(0, 2).join(', ')}</div></td>
-                  <td className="lft"><span className={`pill ${w.party === 'D' ? 'd' : w.party === 'R' ? 'r' : ''}`}>{PARTY[w.party]}</span> {w.name}</td>
+                  <td className="lft"><Candidates y={y} /></td>
                   <td className={mcls(y.margin)}>{y.contested ? mg(y.margin) : <span className="muted">no opponent</span>}</td>
                   <td className={mcls(y.top.margin)}>{mg(y.top.margin)}</td>
                   <td className={y.edge == null ? 'muted' : y.edge >= 0 ? 'ahead' : 'behind'}>{pts(y.edge)}</td>
