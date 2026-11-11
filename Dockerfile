@@ -16,7 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt "uvicorn[standard]"
 
 # Xvfb (virtual display, for MI's headed-browser requirement) + Playwright's own
 # OS-level deps for Chromium, then the Chromium browser binary itself.
-RUN apt-get update && apt-get install -y --no-install-recommends xvfb \
+# libatomic1: Playwright's bundled node driver needs it; newer python:3.12-slim
+# images no longer ship it ("libatomic.so.1: cannot open shared object file").
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 RUN playwright install --with-deps chromium
 
