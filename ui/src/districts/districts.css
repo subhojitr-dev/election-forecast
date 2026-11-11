@@ -1,0 +1,44 @@
+/* Districts tab — reuses the app's dark tokens from index.css */
+.districts .toolbar { margin-bottom: 14px; }
+.districts .dist-nav { margin-bottom: 16px; }
+.districts .muted { color: var(--muted); }
+.districts .small { font-size: 12px; }
+.districts .tiny { font-size: 11px; }
+.districts .err { background: var(--rep-dim); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+
+.districts .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.districts .card .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+.districts .card .big { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+
+.districts .scroll-x { overflow-x: auto; }
+.districts .dist-table td, .districts .dist-table th { white-space: nowrap; }
+.districts .dist-table .lft, .districts th.lft { text-align: left; }
+.districts tr.click { cursor: pointer; }
+.districts .ahead { color: #2ec27e; font-weight: 600; }
+.districts .behind { color: #f0883e; font-weight: 600; }
+.districts .flag { margin-left: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; }
+.districts .count { font-size: 11px; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0 7px; margin-left: 6px; color: var(--muted); }
+.districts .blurb { margin: -6px 0 10px; }
+.districts .foot { font-size: 11px; line-height: 1.5; margin-top: 18px; }
+
+.districts .targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 14px; }
+.districts .targets .panel { overflow-x: auto; }
+
+.districts .detail .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+.districts .detail .back:hover { color: var(--text); }
+.districts .dist-title { font-size: 20px; margin: 4px 0 2px; }
+.districts .detail > .muted.small { margin-bottom: 12px; }
+.districts .votebar { margin-bottom: 14px; }
+.districts .votebar .names { flex-wrap: wrap; gap: 6px 16px; }
+.districts .votebar .seg-o { background: #6b7280; }
+.districts .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+@media (max-width: 760px) {
+  .districts.app { padding: 12px 16px 40px; }
+  .districts .grid2 { grid-template-columns: 1fr; }
+  .districts .targets { grid-template-columns: 1fr; }
+  .districts header.topbar { flex-direction: column; gap: 4px; }
+  .districts .toggle button { padding: 7px 10px; }
+}

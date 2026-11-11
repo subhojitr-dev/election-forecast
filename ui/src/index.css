@@ -162,3 +162,10 @@ tr.sel { background: #1c2536; outline: 1px solid var(--dem); }
   .strip { grid-template-columns: repeat(4, 1fr); }
   .row2 { grid-template-columns: 1fr; }
 }
+
+/* ---- top-level tabs (Statewide | Districts) ---- */
+.tabs-top { max-width: 1400px; margin: 0 auto; padding: 10px 20px 0; display: flex; gap: 6px; }
+.tabs-top a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+  padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; }
+.tabs-top a:hover { color: var(--text); }
+.tabs-top a.on { color: var(--text); background: var(--panel); border-color: var(--border); }
