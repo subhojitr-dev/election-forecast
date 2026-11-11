@@ -6,7 +6,7 @@ import { getDistrictLive } from '../api.js'
 //   Practice: replays 2026 in the browser (no backend), optionally with a swing.
 //   Live:     polls /api/districts/live/{ST} (filled by the production poller).
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
-const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 }, SC: { house: 124, senate: 46 }, OH: { house: 99, senate: 33 } }
+const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 }, SC: { house: 124, senate: 46 }, OH: { house: 99, senate: 33 }, TX: { house: 150, senate: 31 } }
 const POLL_MS = 30000
 
 const num = (x) => (x == null ? '—' : Math.round(x).toLocaleString())
@@ -338,7 +338,7 @@ function LiveDistrict({ baseYear, st, chamber, x, pinned, onPin, practice, plan 
   const remShare = remaining ? remD / remaining : null
   const truth = practice ? plan?.[x.dist]?.trueSwing : null
   const cands = x.cands.slice().sort((a, b) => (b.votes || 0) - (a.votes || 0))
-  const label = `${{ GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio' }[st]} ${CHAMBERS[chamber]} District ${x.dist}`
+  const label = `${{ GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio', TX: 'Texas' }[st]} ${CHAMBERS[chamber]} District ${x.dist}`
 
   return (
     <div className="detail">

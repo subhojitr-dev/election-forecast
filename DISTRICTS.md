@@ -1,4 +1,4 @@
-# Districts tab — GA, NC, SC & OH legislature
+# Districts tab — GA, NC, SC, OH & TX legislature
 
 App: https://election-forecast-silk.vercel.app/#/districts/GA  (and `/NC`)
 
@@ -91,3 +91,16 @@ next live GA special election (GA holds several a year) and adjust `GA_DONE_STAT
 - **Election night** is county-level (as Ohio reports): `DISTRICT_LIVE_OH=1` →
   `district_live_feed.fetch_oh` (one XML every 2 min). A county counts as in when its
   precincts are all reported.
+
+## Texas
+
+- **2024** (150 House + 15 Senate seats): MIT Election Lab official precinct file (`tx24.zip`,
+  built from Texas Legislative Council returns). Validated: House 88 R–62 D; Harris/Trump within
+  ~200 votes of certified. **Candidate names are last names only** in this source.
+- **2026: not loaded yet.** The SoS election-night site (goelect.txelections.civixapps.com)
+  requires an interactive Cloudflare check, so it is not scraped; the old
+  results.texas-election.com site is retired. When an official 2026 precinct file appears
+  (TLC Capitol Data Portal, usually a few months after the election, or MEDSL), save it in the
+  MEDSL column layout as `data/raw/districts/tx/tx26.csv` (top of ticket = `US SENATE`) and run
+  `py ingestor/district_results.py TX`.
+- **Election night:** practice replay of 2024 only — no live feed (the live site is behind the check).

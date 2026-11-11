@@ -22,7 +22,7 @@ Sources (all official, public, no login):
 Edge = legislative two-party margin minus top-of-ticket margin in the same district:
 positive = the Democratic legislative candidate ran AHEAD of the top of the ticket.
 
-Usage:  py ingestor/district_results.py [GA|NC|SC|OH|ALL]
+Usage:  py ingestor/district_results.py [GA|NC|SC|OH|TX|ALL]
 """
 from __future__ import annotations
 
@@ -460,6 +460,48 @@ def oh_lean_prior(prec24):
     return lean
 
 
+# --------------------------------------------------------------------------- TX
+# 2024: MIT Election Lab official precinct file (MEDSL individual_states/tx24.zip, built
+#       from the Texas Legislative Council's returns): President, State House, State Senate.
+#       Candidate names are LAST NAMES only in this source.
+# 2026: not loaded. The SoS election-night site (goelect.txelections.civixapps.com) sits
+#       behind an interactive Cloudflare check, so it is not scraped. When an official
+#       2026 precinct file is published (TLC Capitol Data Portal / MEDSL), save it in the
+#       same column layout as data/raw/districts/tx/tx26.csv and re-run.
+TX_RAW = RAW / "tx"
+
+
+def _load_medsl(path, url=None, top_office="US PRESIDENT"):
+    if not path.exists():
+        if not url:
+            return None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        zipfile.ZipFile(io.BytesIO(_get(url).content)).extractall(path.parent)
+    office = {top_office: "top", "STATE HOUSE": "house", "STATE SENATE": "senate"}
+    agg = defaultdict(int)
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for r in csv.DictReader(f):
+            kind = office.get(r["office"])
+            if not kind or r["candidate"].upper() in ("UNDERVOTES", "OVERVOTES"):
+                continue
+            v = int(float(r["votes"] or 0))
+            if not v:
+                continue
+            wi = r["writein"] == "TRUE"
+            party = "O" if wi else {"DEMOCRAT": "D", "REPUBLICAN": "R"}.get(r["party_simplified"], "O")
+            name = "Write-in" if wi else r["candidate"].title()
+            dist = int(r["district"]) if kind != "top" else 0
+            agg[(r["county_name"].strip(), r["precinct"].strip(), kind, dist, (name, party, False))] += v
+    return [(c, p_, True, k, d, cand, {"all": v}) for (c, p_, k, d, cand), v in agg.items()]
+
+
+def load_tx(year: int):
+    if year == 2026:
+        return _load_medsl(TX_RAW / "tx26.csv", top_office="US SENATE")
+    return _load_medsl(TX_RAW / "tx24.csv",
+                       "https://github.com/MEDSL/2024-elections-official/raw/main/individual_states/tx24.zip")
+
+
 # --------------------------------------------------------------------------- build
 def _total(by):
     return sum(by.values())
@@ -636,6 +678,8 @@ STATE_CFG = {
                      "MIT Election Lab official precinct returns for 2024", "unit_all": True},
     "OH": {"source": "Ohio Secretary of State results (liveresults.ohiosos.gov) for 2026, by county; "
                      "MIT Election Lab official precinct returns for 2024"},
+    "TX": {"source": "MIT Election Lab official precinct returns (Texas Legislative Council) for 2024; "
+                     "2026 is added when Texas publishes its official precinct file"},
 }
 YEARS = (2024, 2026)
 
@@ -661,6 +705,14 @@ def _load_year(state, year, notes):
             notes.append("OH 2026: Ohio reports legislative results by county until certification. "
                          "In counties shared by several districts, the US Senate vote is split by each "
                          "district's 2024 lean there (estimated).")
+    elif state == "TX":
+        prec = load_tx(year)
+        if prec is None:
+            notes.append("TX 2026: added when Texas publishes official precinct results "
+                         "(the state's election-night site is not machine-readable). "
+                         "2024 candidate names are last names only, as the source lists them.")
+            return {}, TOP_LABEL[year]
+        dd = build(state, year, prec)
     else:
         prec = load_sc(year)
         if prec is None:

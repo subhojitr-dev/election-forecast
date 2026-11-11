@@ -4,7 +4,7 @@ import LiveView from './LiveView.jsx'
 
 // Static data built by ingestor/district_results.py → ui/public/districts/.
 // No backend call: these pages load instantly even when the Render API is asleep.
-const STATES = { GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio' }
+const STATES = { GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio', TX: 'Texas' }
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
 // Dem top-of-ticket candidate per year (Ossoff / Cooper / Harris…), stored in the data by the builder
 const topNameOf = (data, year) => data?.top_names?.[String(year)] || TOP_RACE[year] || 'Top of ticket'
