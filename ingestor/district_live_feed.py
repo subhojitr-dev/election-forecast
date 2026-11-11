@@ -21,6 +21,7 @@ Payload:
 Configure an election (Render → Environment), then the production poller picks it up:
   DISTRICT_LIVE_GA_EID = e.g. 11072028GeneralElection   (from results.sos.ga.gov/results/public/Georgia)
   DISTRICT_LIVE_NC_DATE = e.g. 2028-11-07                (NCSBE ENRS folder date)
+  DISTRICT_LIVE_SC_EID = e.g. 127300                     (enr-scvotes.org election id)
 
 CLI:
   py ingestor/district_live_feed.py GA <eid>          one poll → DB
@@ -41,8 +42,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from district_results import (GA_API, GA_CONTEST, NC_S3, _ga_cand, _get, _nc_kind,  # noqa: E402
-                              _party, _txt)
+import re  # noqa: E402
+
+from district_results import (GA_API, GA_CONTEST, NC_S3, SC_CONTEST, _ga_cand, _get,  # noqa: E402
+                              _nc_kind, _party, _sc_party, _txt)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, "data", "db", "baseline.db")
@@ -147,6 +150,60 @@ def fetch_nc(day: str):
     return _finish("NC", f"North Carolina {day}", chambers)
 
 
+# --------------------------------------------------------------------------- SC
+SC_BASE = "https://www.enr-scvotes.org/SC"
+
+
+def _sc_county(name, eid, ver):
+    base = f"{SC_BASE}/{name.replace(' ', '_')}/{eid}/{ver}"
+    s, d = _get(f"{base}/json/en/summary.json"), _get(f"{base}/json/details.json")
+    if s is None or d is None:
+        return []
+    by_k = {c["K"]: c for c in d.json()["Contests"]}
+    rows = []
+    for c in s.json():
+        title = " ".join(c["C"].split())
+        kind = dist = None
+        for rx, k in SC_CONTEST:
+            m = rx.match(title)
+            if m and k != "top":
+                kind, dist = k, int(m.group(1))
+        det = by_k.get(c["K"])
+        if not kind or not det:
+            continue
+        cands = [(re.sub(r"^\S+\s+", "", n).strip() if not n.lower().startswith("write") else "Write-in",
+                  "O" if n.lower().startswith("write") else _sc_party(p), False)
+                 for n, p in zip(c["CH"], c["P"])]
+        # Clarity marks nothing per precinct; a precinct with any votes in the contest counts as in.
+        for pname, votes in zip(det["P"], det["V"]):
+            done = sum(votes) > 0
+            for cand, v in zip(cands, votes):
+                rows.append((kind, dist, name.upper(), pname.strip(), cand, int(v), done))
+    return rows
+
+
+def fetch_sc(eid: str, workers: int = 4):
+    """SC Election Commission (Clarity ENR). ⚠️ As of Nov 2026 its CDN refuses scripted
+    requests (403/405) — it was open in July 2026. Re-test before relying on this for a
+    live night; if still blocked, SC stays practice-only rather than working around it."""
+    v = _get(f"{SC_BASE}/{eid}/current_ver.txt")
+    if v is None:
+        raise RuntimeError(f"SC election {eid} not reachable")
+    ver = v.text.strip()
+    es = _get(f"{SC_BASE}/{eid}/{ver}/json/en/electionsettings.json").json()
+    ed = es["settings"]["electiondetails"]
+    ed = json.loads(ed) if isinstance(ed, str) else ed
+    pc = ed["participatingcounties"]
+    pc = json.loads(pc) if isinstance(pc, str) else pc
+    counties = [x.split("|")[:3] for x in pc]
+    chambers = _empty()
+    with ThreadPoolExecutor(workers) as ex:
+        for rows in ex.map(lambda c: _sc_county(*c), counties):
+            for kind, dist, county, pname, cand, v, done in rows:
+                _add(chambers[kind][dist], county, pname, "all", cand, v, done)
+    return _finish("SC", f"South Carolina {eid}", chambers)
+
+
 # --------------------------------------------------------------------------- store
 def store(payload, db_path=DB):
     con = sqlite3.connect(db_path)
@@ -179,6 +236,10 @@ def poll_ga():
     return store(fetch_ga(os.environ["DISTRICT_LIVE_GA_EID"]))
 
 
+def poll_sc():
+    return store(fetch_sc(os.environ["DISTRICT_LIVE_SC_EID"]))
+
+
 def poll_nc():
     return store(fetch_nc(os.environ["DISTRICT_LIVE_NC_DATE"]))
 
@@ -187,6 +248,8 @@ if __name__ == "__main__":
     cmd = sys.argv[1].upper() if len(sys.argv) > 1 else ""
     if cmd == "GA":
         print(store(fetch_ga(sys.argv[2])))
+    elif cmd == "SC":
+        print(store(fetch_sc(sys.argv[2])))
     elif cmd == "NC":
         print(store(fetch_nc(sys.argv[2])))
     elif cmd == "CLEAR":

@@ -163,6 +163,8 @@ def build_production_tasks() -> list[PollTask]:
                   enabled=bool(os.environ.get("DISTRICT_LIVE_GA_EID"))),
         PollTask("NC districts", 60, district_live_feed.poll_nc,
                   enabled=bool(os.environ.get("DISTRICT_LIVE_NC_DATE"))),
+        PollTask("SC districts", 120, district_live_feed.poll_sc,
+                  enabled=bool(os.environ.get("DISTRICT_LIVE_SC_EID"))),
     ]
 
 

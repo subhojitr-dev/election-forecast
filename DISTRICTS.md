@@ -1,4 +1,4 @@
-# Districts tab — GA & NC legislature
+# Districts tab — GA, NC & SC legislature
 
 App: https://election-forecast-silk.vercel.app/#/districts/GA  (and `/NC`)
 
@@ -52,3 +52,20 @@ Known caveat: GA precinct `reportingStatus` codes differ by county (certified 20
 Fayette = 4). A precinct counts as done if it is 3 OR the county reports the contest fully in, so
 Fayette-style counties look "partly in" until finished — cautious, never early. Watch this at the
 next live GA special election (GA holds several a year) and adjust `GA_DONE_STATUS` if needed.
+
+## South Carolina
+
+- **2024** (all 124 House + 46 Senate seats): MIT Election Lab official precinct file,
+  downloaded automatically from github.com/MEDSL/2024-elections-official (`sc24.zip`).
+  Validated: House 88 R–36 D, Senate 34 R–12 D; President within 0.03% of certified.
+  SC has fusion voting — candidates are merged across party lines by name.
+- **2026** (124 House seats + SD-15 special): SC Election Commission ENR, election **127300**
+  (county ids in its `electionsettings.json` → `participatingcounties`). Per county:
+  `/SC/{County}/{eid}/{ver}/json/en/summary.json` (candidates) + `/json/details.json`
+  (precinct votes). **Not loaded yet:** the site's CDN refuses scripted requests and
+  rate-limits bulk reads, so it must not be scraped around. Save the export as
+  `data/raw/districts/sc/sc_2026_enr.json` (format in `load_sc`) and re-run
+  `py ingestor/district_results.py SC` — 2026 then becomes the House baseline automatically.
+- **Senate** baseline stays 2024 (next regular SC Senate election is 2028).
+- **Live:** `DISTRICT_LIVE_SC_EID` → `district_live_feed.fetch_sc`. ⚠️ Blocked to scripts as of
+  Nov 2026 (open in July 2026) — re-test before a live night; if still blocked, SC is practice-only.

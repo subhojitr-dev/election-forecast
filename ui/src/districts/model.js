@@ -162,7 +162,7 @@ export function statusOf(pD, f, unopposed) {
 // optional swing so the model has something to discover.
 //   scenario: 'actual' | 'dem3' | 'rep3' | 'random'
 export const SCENARIOS = {
-  actual: '2026 as it happened',
+  actual: 'As it happened',
   dem3: 'Democrats 3 pts better everywhere',
   rep3: 'Republicans 3 pts better everywhere',
   random: 'Surprise: every district swings differently',

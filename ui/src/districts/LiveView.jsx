@@ -6,7 +6,7 @@ import { getDistrictLive } from '../api.js'
 //   Practice: replays 2026 in the browser (no backend), optionally with a swing.
 //   Live:     polls /api/districts/live/{ST} (filled by the production poller).
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
-const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 } }
+const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 }, SC: { house: 124, senate: 46 } }
 const POLL_MS = 30000
 
 const num = (x) => (x == null ? '—' : Math.round(x).toLocaleString())
@@ -22,7 +22,7 @@ function loadBase(st, ch) {
   const k = `${st}/${ch}`
   if (!baseCache[k]) {
     baseCache[k] = fetch(`/districts/${st}/baseline-${ch}.json`).then((r) => {
-      if (!r.ok) throw new Error('Could not load the 2026 baseline')
+      if (!r.ok) throw new Error('Could not load the baseline')
       return r.json()
     })
   }
@@ -59,6 +59,7 @@ function fromApi(payload, chamber) {
 export default function LiveView({ st, chamber, district, summary }) {
   const [mode, setMode] = useState('practice')
   const [raw, setRaw] = useState(null)
+  const [baseYear, setBaseYear] = useState(null)
   const [err, setErr] = useState(null)
   const [scenario, setScenario] = useState('random')
   const [batch, setBatch] = useState(0)
@@ -69,7 +70,7 @@ export default function LiveView({ st, chamber, district, summary }) {
 
   useEffect(() => {
     setRaw(null); setErr(null)
-    loadBase(st, chamber).then((b) => setRaw(b.districts), (e) => setErr(e.message))
+    loadBase(st, chamber).then((b) => { setRaw(b.districts); setBaseYear(b.year) }, (e) => setErr(e.message))
   }, [st, chamber])
 
   useEffect(() => { setBatch(0); setPlaying(false) }, [st, scenario])
@@ -98,7 +99,7 @@ export default function LiveView({ st, chamber, district, summary }) {
   // real 2026 candidate names for practice mode
   const names = useMemo(() => {
     const m = {}
-    for (const r of summary.districts) if (r.chamber === chamber && r['2026']) m[r.district] = r['2026'].cands
+    for (const r of summary.districts) if (r.chamber === chamber && (r['2026'] || r['2024'])) m[r.district] = (r['2026'] || r['2024']).cands
     return m
   }, [summary, chamber])
 
@@ -116,13 +117,13 @@ export default function LiveView({ st, chamber, district, summary }) {
   const proj = useMemo(() => base && live && projectAll(base, live), [base, live])
 
   if (err) return <div className="err">{err}</div>
-  if (!proj) return <div className="panel muted">Loading the 2026 baseline…</div>
+  if (!proj) return <div className="panel muted">Loading the baseline…</div>
 
   const controls = (
     <div className="panel live-controls">
       <div className="sim-row">
         <div className="toggle">
-          <button className={mode === 'practice' ? 'on' : ''} onClick={() => setMode('practice')}>Practice: replay 2026</button>
+          <button className={mode === 'practice' ? 'on' : ''} onClick={() => setMode('practice')}>Practice: replay {baseYear || 'last election'}</button>
           <button className={mode === 'live' ? 'on' : ''} onClick={() => setMode('live')}>Live results</button>
         </div>
         {mode === 'practice' ? (
@@ -147,9 +148,9 @@ export default function LiveView({ st, chamber, district, summary }) {
       {mode === 'practice' && <div className="progbar"><div style={{ width: `${(batch / BATCHES) * 100}%` }} /></div>}
       {mode === 'practice' && (
         <p className="muted small" style={{ margin: '8px 0 0' }}>
-          Practice replays the real 2026 count in {BATCHES} batches{st === 'NC' ? ' (early and mail votes first, as NC reports them)' : ''}.
+          Practice replays the real {baseYear} count in {BATCHES} batches{st === 'NC' ? ' (early and mail votes first, as NC reports them)' : ''}.
           Pick a scenario, then watch each district’s projection settle as precincts come in — the projection compares every
-          counted precinct with the same precinct in 2026.
+          counted precinct with the same precinct in {baseYear}.
         </p>
       )}
     </div>
@@ -159,9 +160,9 @@ export default function LiveView({ st, chamber, district, summary }) {
     <>
       {controls}
       {district
-        ? <LiveDistrict st={st} chamber={chamber} x={proj.districts[district]} pinned={pins.includes(`${chamber}-${district}`)}
+        ? <LiveDistrict baseYear={baseYear} st={st} chamber={chamber} x={proj.districts[district]} pinned={pins.includes(`${chamber}-${district}`)}
                         onPin={() => togglePin(`${chamber}-${district}`)} practice={mode === 'practice'} plan={plan} />
-        : <LiveTable st={st} chamber={chamber} proj={proj} pins={pins} togglePin={togglePin}
+        : <LiveTable baseYear={baseYear} st={st} chamber={chamber} proj={proj} pins={pins} togglePin={togglePin}
                      practice={mode === 'practice'} plan={plan} batch={batch} />}
     </>
   )
@@ -181,7 +182,7 @@ function Status({ s }) {
   return <span className={`status ${s.tier} ${s.party === 'D' ? 'd' : s.party === 'R' ? 'r' : ''}`}>{s.label}</span>
 }
 
-function LiveTable({ st, chamber, proj, pins, togglePin, practice, plan, batch }) {
+function LiveTable({ baseYear, st, chamber, proj, pins, togglePin, practice, plan, batch }) {
   const [sort, setSort] = useState('close')
   const [q, setQ] = useState('')
   const rows = Object.values(proj.districts)
@@ -230,7 +231,7 @@ function LiveTable({ st, chamber, proj, pins, togglePin, practice, plan, batch }
           <div className="muted small">Expected Dem seats {expD.toFixed(1)} · {projD >= majority ? 'Dem majority' : 'Rep majority'} projected</div>
         </div>
         <div className="panel card">
-          <div className="lbl">Swing vs 2026 (counted precincts)</div>
+          <div className="lbl">Swing vs {baseYear} (counted precincts)</div>
           <div className={`big ${anyCounted ? mcls(proj.stateShift) : 'muted'}`}>{anyCounted ? `${pts(proj.stateShift * 2)} pts` : '—'}</div>
           <div className="muted small">{practice && batch === BATCHES ? `Scenario’s true swing: ${scenarioTruth(plan)}` : 'Change in Dem margin, same precincts'}</div>
         </div>
@@ -258,7 +259,7 @@ function LiveTable({ st, chamber, proj, pins, togglePin, practice, plan, batch }
         <table className="dist-table">
           <thead><tr>
             <th title="Pin to the top">★</th><th className="lft">District</th><th>Counted</th><th>Now</th>
-            <th>Projected</th><th className="lft">Dem win chance</th><th className="lft">Status</th><th title="Dem margin change vs 2026 in counted precincts">Swing</th>
+            <th>Projected</th><th className="lft">Dem win chance</th><th className="lft">Status</th><th title={`Dem margin change vs ${baseYear} in counted precincts`}>Swing</th>
           </tr></thead>
           <tbody>
             {list.map((x) => {
@@ -281,7 +282,7 @@ function LiveTable({ st, chamber, proj, pins, togglePin, practice, plan, batch }
         </table>
       </div>
       <p className="muted tiny">
-        “Now” = margin among votes counted so far. “Projected” fills in the uncounted precincts with their 2026 result
+        “Now” = margin among votes counted so far. “Projected” fills in the uncounted precincts with their result from last time
         plus the swing seen in this district (blended with the statewide swing while few precincts are in).
         A winner is only “projected” once the chance is above 99.5% with at least half the expected vote counted.
       </p>
@@ -298,7 +299,7 @@ function scenarioTruth(plan) {
 }
 
 // ----------------------------------------------------------------------------
-function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
+function LiveDistrict({ baseYear, st, chamber, x, pinned, onPin, practice, plan }) {
   const [tab, setTab] = useState('in')
   if (!x) return <div className="panel muted">No such district.</div>
   const tot = x.counted.d + x.counted.r + x.counted.o || 1
@@ -309,7 +310,7 @@ function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
   const remShare = remaining ? remD / remaining : null
   const truth = practice ? plan?.[x.dist]?.trueSwing : null
   const cands = x.cands.slice().sort((a, b) => (b.votes || 0) - (a.votes || 0))
-  const label = `${st === 'GA' ? 'Georgia' : 'North Carolina'} ${CHAMBERS[chamber]} District ${x.dist}`
+  const label = `${{ GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina' }[st]} ${CHAMBERS[chamber]} District ${x.dist}`
 
   return (
     <div className="detail">
@@ -348,7 +349,7 @@ function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
           <WinBar pD={x.pD} />
         </div>
         <div className="panel card">
-          <div className="lbl">Swing vs 2026 here</div>
+          <div className="lbl">Swing vs {baseYear} here</div>
           <div className={`big ${x.districtShift == null ? 'muted' : mcls(x.districtShift)}`}>
             {x.districtShift == null ? 'none counted yet' : `${pts(x.districtShift * 2)} pts`}
           </div>
@@ -372,7 +373,7 @@ function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
         </div>
         {tab === 'in' ? (
           <table className="dist-table">
-            <thead><tr><th className="lft">Precinct</th><th>Method</th><th>Votes</th><th>Dem share now</th><th>2026</th><th>Change</th></tr></thead>
+            <thead><tr><th className="lft">Precinct</th><th>Method</th><th>Votes</th><th>Dem share now</th><th>{baseYear}</th><th>Change</th></tr></thead>
             <tbody>
               {counted.sort((a, b) => ((a.liveShare - (a.share ?? a.liveShare)) - (b.liveShare - (b.share ?? b.liveShare)))).map((u) => (
                 <tr key={u.key}>
@@ -388,7 +389,7 @@ function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
           </table>
         ) : (
           <table className="dist-table">
-            <thead><tr><th className="lft">Precinct</th><th>Method</th><th>Expected votes left</th><th>2026 Dem share</th><th>Projected Dem share</th></tr></thead>
+            <thead><tr><th className="lft">Precinct</th><th>Method</th><th>Expected votes left</th><th>{baseYear} Dem share</th><th>Projected Dem share</th></tr></thead>
             <tbody>
               {out.sort((a, b) => (b.exp2 - b.ld - b.lr) - (a.exp2 - a.ld - a.lr)).map((u) => {
                 const left = Math.max(u.exp2 - u.ld - u.lr, 0)
@@ -407,9 +408,9 @@ function LiveDistrict({ st, chamber, x, pinned, onPin, practice, plan }) {
         )}
       </div>
       <p className="muted tiny">
-        {x.useLeg ? 'Baseline = the 2026 race for this seat, precinct by precinct.'
-          : 'This seat was uncontested in 2026, so the baseline is the 2026 US Senate vote in the same precincts.'}
-        {' '}Precincts that didn’t exist in 2026 are counted but not projected.
+        {x.useLeg ? `Baseline = the ${baseYear} race for this seat, precinct by precinct.`
+          : `This seat was uncontested last time, so the baseline is the top of the ticket (${baseYear === 2024 ? 'President' : 'US Senate'}) in the same precincts.`}
+        {' '}Precincts that didn’t exist last time are counted but not projected.
       </p>
     </div>
   )

@@ -4,9 +4,13 @@ import LiveView from './LiveView.jsx'
 
 // Static data built by ingestor/district_results.py → ui/public/districts/.
 // No backend call: these pages load instantly even when the Render API is asleep.
-const STATES = { GA: 'Georgia', NC: 'North Carolina' }
+const STATES = { GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina' }
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
-const TOP_NAME = { GA: { 2026: 'Ossoff', 2024: 'Harris' }, NC: { 2026: 'Cooper', 2024: 'Harris' } }
+// Dem top-of-ticket candidate per year (Ossoff / Cooper / Harris…), stored in the data by the builder
+const topNameOf = (data, year) => data?.top_names?.[String(year)] || TOP_RACE[year] || 'Top of ticket'
+// most recent election available for a district row (SC Senate: 2024, plus a 2026 special)
+const latestOf = (r) => r['2026'] || r['2024']
+const latestYearOf = (r) => (r['2026'] ? '2026' : '2024')
 const TOP_RACE = { 2026: 'US Senate', 2024: 'President' }
 
 const cache = {}
@@ -82,14 +86,14 @@ export default function Districts({ parts }) {
     <div className="app districts">
       <header className="topbar">
         <h1>🗺️ Legislative Districts</h1>
-        <span className="sub">2026 results for every State House &amp; Senate seat · compared with the top of the ticket and with 2024</span>
+        <span className="sub">Latest results for every State House &amp; Senate seat · compared with the top of the ticket and with the previous election</span>
       </header>
 
       <div className="toolbar dist-nav">
-        <Seg value={st} options={{ GA: 'Georgia', NC: 'North Carolina' }}
+        <Seg value={st} options={STATES}
              onChange={(s) => { window.location.hash = href(s, ...(view === 'targets' || view === 'live' ? [view] : [])) }} />
         <Seg value={view === 'targets' || view === 'live' ? view : 'table'}
-             options={{ table: '2026 results', targets: '2028 targets', live: 'Election night' }}
+             options={{ table: 'Results', targets: '2028 targets', live: 'Election night' }}
              onChange={(v) => { window.location.hash = v === 'table' ? href(st) : href(st, v) }} />
       </div>
 
@@ -124,12 +128,14 @@ const FILTERS = {
 
 function DistrictTable({ st, data }) {
   const [chamber, setChamber] = useState('house')
-  const [year, setYear] = useState('2026')
+  const [year, setYear] = useState(String(data.latest?.house || 2026))
+  const yearsFor = (ch) => (data.years || [2024, 2026]).map(String).filter((y) => data.districts.some((r) => r.chamber === ch && r[y]))
+  const pickChamber = (ch) => { setChamber(ch); setYear(String(data.latest?.[ch] || 2026)) }
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState({ key: 'district', dir: 1 })
   const prev = year === '2026' ? '2024' : null
-  const topName = TOP_NAME[st][year]
+  const topName = topNameOf(data, year)
 
   const rows = useMemo(() => {
     let rs = data.districts.filter((r) => r.chamber === chamber && r[year])
@@ -172,8 +178,8 @@ function DistrictTable({ st, data }) {
   return (
     <>
       <div className="toolbar">
-        <Seg value={chamber} options={CHAMBERS} onChange={setChamber} />
-        <Seg value={year} options={{ 2026: '2026', 2024: '2024' }} onChange={setYear} />
+        <Seg value={chamber} options={CHAMBERS} onChange={pickChamber} />
+        <Seg value={year} options={Object.fromEntries(yearsFor(chamber).reverse().map((y) => [y, y]))} onChange={setYear} />
         <Seg value={filter} options={FILTERS} onChange={setFilter} />
         <div className="search">
           <input placeholder="District #, candidate or county…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -242,20 +248,21 @@ function DistrictTable({ st, data }) {
 // ======================================================================
 // 2028 targets — built from the 2026 result
 function Targets({ st, data }) {
-  const topName = TOP_NAME[st][2026]
+  const topName = [...new Set(data.districts.map((r) => topNameOf(data, latestYearOf(r))))].join(' / ')
   const groups = useMemo(() => {
-    const rs = data.districts.filter((r) => r['2026'])
-    const R = rs.filter((r) => winner(r['2026']).party !== 'D')
-    const D = rs.filter((r) => winner(r['2026']).party === 'D')
+    const rs = data.districts.filter((r) => latestOf(r))
+    const L = latestOf
+    const R = rs.filter((r) => winner(L(r)).party !== 'D')
+    const D = rs.filter((r) => winner(L(r)).party === 'D')
     return {
-      pickup: R.filter((r) => r['2026'].contested && r['2026'].margin > -0.1)
-        .sort((a, b) => b['2026'].margin - a['2026'].margin),
-      crossover: R.filter((r) => r['2026'].top.margin > 0)
-        .sort((a, b) => b['2026'].top.margin - a['2026'].top.margin),
-      noDem: R.filter((r) => !r['2026'].contested && r['2026'].top.margin > -0.2)
-        .sort((a, b) => b['2026'].top.margin - a['2026'].top.margin),
-      defend: D.filter((r) => (r['2026'].margin != null && r['2026'].margin < 0.08) || r['2026'].top.margin < 0.03)
-        .sort((a, b) => (a['2026'].margin ?? a['2026'].top.margin) - (b['2026'].margin ?? b['2026'].top.margin)),
+      pickup: R.filter((r) => L(r).contested && L(r).margin > -0.1)
+        .sort((a, b) => L(b).margin - L(a).margin),
+      crossover: R.filter((r) => L(r).top.margin > 0)
+        .sort((a, b) => L(b).top.margin - L(a).top.margin),
+      noDem: R.filter((r) => !L(r).contested && L(r).top.margin > -0.2)
+        .sort((a, b) => L(b).top.margin - L(a).top.margin),
+      defend: D.filter((r) => (L(r).margin != null && L(r).margin < 0.08) || L(r).top.margin < 0.03)
+        .sort((a, b) => (L(a).margin ?? L(a).top.margin) - (L(b).margin ?? L(b).top.margin)),
     }
   }, [data])
 
@@ -265,10 +272,10 @@ function Targets({ st, data }) {
       <p className="muted small blurb">{blurb}</p>
       {rows.length ? (
         <table className="dist-table">
-          <thead><tr><th>Seat</th><th className="lft">2026 candidates</th><th>Margin</th><th>{topName}</th><th>Edge</th></tr></thead>
+          <thead><tr><th>Seat</th><th className="lft">Latest candidates</th><th>Margin</th><th>{topName}</th><th>Edge</th></tr></thead>
           <tbody>
             {rows.map((r) => {
-              const y = r['2026']
+              const y = latestOf(r)
               return (
                 <tr key={r.chamber + r.district} className="click"
                     onClick={() => { window.location.hash = href(st, r.chamber, r.district) }}>
@@ -306,7 +313,7 @@ function Targets({ st, data }) {
 function Detail({ st, chamber, district, summary }) {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(null)
-  const [year, setYear] = useState('2026')
+  const [year, setYear] = useState(null)
   const [psort, setPsort] = useState({ key: 'edge', dir: 1 })
   useEffect(() => {
     setD(null); setErr(null)
@@ -314,8 +321,9 @@ function Detail({ st, chamber, district, summary }) {
   }, [st, chamber, district])
 
   const row = summary.districts.find((r) => r.chamber === chamber && r.district === district)
-  const y = d?.[year]
-  const topName = TOP_NAME[st][year]
+  const yr = year || (d && (d['2026'] ? '2026' : '2024'))
+  const y = d?.[yr]
+  const topName = topNameOf(summary, yr)
   const title = `${STATES[st]} ${CHAMBERS[chamber]} District ${district}`
 
   const precincts = useMemo(() => {
@@ -331,7 +339,7 @@ function Detail({ st, chamber, district, summary }) {
 
   if (err) return <div className="err">{err}</div>
   if (!d) return <div className="panel muted">Loading {title}…</div>
-  if (!y) return <div className="panel muted">No {year} result for this district.</div>
+  if (!y) return <div className="panel muted">No {yr} result for this district.</div>
 
   const w = y.cands[0]
   const D = y.cands.filter((c) => c.party === 'D')
@@ -345,7 +353,7 @@ function Detail({ st, chamber, district, summary }) {
     <div className="detail">
       <div className="toolbar">
         <a className="back" href={href(st)}>← All {STATES[st]} districts</a>
-        <Seg value={year} options={d['2024'] ? { 2026: '2026', 2024: '2024' } : { 2026: '2026' }} onChange={setYear} />
+        <Seg value={yr} options={Object.fromEntries(['2026', '2024'].filter((k) => d[k]).map((k) => [k, k]))} onChange={setYear} />
       </div>
       <h2 className="dist-title">{title}</h2>
       <div className="muted small">{y.counties.map((c) => c.county).join(' · ')}</div>
@@ -375,7 +383,7 @@ function Detail({ st, chamber, district, summary }) {
           <div className="muted small">{num(y.total)} votes</div>
         </div>
         <div className="panel card">
-          <div className="lbl">{topName} ({TOP_RACE[year]}) here</div>
+          <div className="lbl">{topName} ({TOP_RACE[yr]}) here</div>
           <div className={`big ${mcls(y.top.margin)}`}>{mg(y.top.margin)}</div>
           <div className="muted small">{num(y.top.d)} D · {num(y.top.r)} R{y.est_share > 0.05 ? ' · partly estimated*' : ''}</div>
         </div>
@@ -389,12 +397,12 @@ function Detail({ st, chamber, district, summary }) {
               : y.edge >= 0 ? `The Democrat ran ahead of ${topName}` : `The Democrat ran behind ${topName}`}
           </div>
         </div>
-        {year === '2026' && row?.['2024'] && (
+        {yr === '2026' && row?.['2024'] && (
           <div className="panel card">
             <div className="lbl">Since 2024</div>
             <div className={`big ${row.swing == null ? 'muted' : mcls(row.swing)}`}>{row.swing == null ? '—' : `${pts(row.swing)} pts`}</div>
             <div className="muted small">
-              2024: {row['2024'].contested ? mg(row['2024'].margin) : 'uncontested'} · {TOP_NAME[st][2024]} {mg(row['2024'].top.margin)}
+              2024: {row['2024'].contested ? mg(row['2024'].margin) : 'uncontested'} · {topNameOf(summary, 2024)} {mg(row['2024'].top.margin)}
             </div>
           </div>
         )}
@@ -446,7 +454,7 @@ function Detail({ st, chamber, district, summary }) {
           {y.contested
             ? `Sorted by edge — the precincts where the Democrat ran furthest behind ${topName} are at the top. Click a column to re-sort.`
             : 'Uncontested race — shown for turnout and top-of-ticket lean only.'}
-          {st === 'NC' && year === '2026' ? ' NC precinct rows include Election Day votes only for now; early and mail votes appear in the totals above.' : ''}
+          {st === 'NC' && yr === '2026' ? ' NC precinct rows include Election Day votes only for now; early and mail votes appear in the totals above.' : ''}
         </p>
         <table className="dist-table">
           <thead><tr>{pth('precinct', 'Precinct')}{pth('votes', 'Votes')}{pth('m', 'Dem margin')}{pth('tm', topName)}{pth('edge', 'Edge')}</tr></thead>
@@ -464,7 +472,7 @@ function Detail({ st, chamber, district, summary }) {
         </table>
       </div>
       {y.est_share > 0.05 && (
-        <p className="muted tiny">* {Math.round(y.est_share * 100)}% of this district’s {TOP_RACE[year]} votes were cast early or by mail in a county with several districts and are reported county-wide. Their split between districts is estimated from each district’s Election Day lean until the State Board posts precinct-sorted results.</p>
+        <p className="muted tiny">* {Math.round(y.est_share * 100)}% of this district’s {TOP_RACE[yr]} votes were cast early or by mail in a county with several districts and are reported county-wide. Their split between districts is estimated from each district’s Election Day lean until the State Board posts precinct-sorted results.</p>
       )}
     </div>
   )

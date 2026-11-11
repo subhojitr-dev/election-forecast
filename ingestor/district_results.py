@@ -268,12 +268,95 @@ def load_nc(year: int):
     return _nc_pct(year), False
 
 
+# --------------------------------------------------------------------------- SC
+# 2026: SC Election Commission ENR (enr-scvotes.org, election 127300). Its CDN refuses
+#       scripted requests, so the per-county files are read IN THE BROWSER (see
+#       DISTRICTS.md → "SC data") and saved as data/raw/districts/sc/sc_2026_enr.json:
+#       [{county, title, CH: ["REP Jane Doe", ...], P: ["REP", ...], precincts: [...], V: [[...]]}]
+#       V[i][j] = votes for candidate j in precinct i (same order as CH).
+# 2024: MIT Election Lab official precinct file (github.com/MEDSL/2024-elections-official,
+#       individual_states/sc24.zip) — President, State House, State Senate, by vote mode.
+# SC has fusion voting (one candidate on several party lines): candidates are merged by
+# name and classed by their major-party line.
+SC_RAW = RAW / "sc"
+SC_PSEUDO = re.compile(r"failsafe|provisional|absentee|emergency", re.I)
+SC_CONTEST = [
+    (re.compile(r"^U\.S\. Senate$"), "top"),
+    (re.compile(r"^State House of Representatives, District (\d+)$"), "house"),
+    (re.compile(r"^State Senate District (\d+)\b"), "senate"),
+]
+SC_MODE = {"ELECTION DAY": "Election Day", "EARLY": "Early", "ABSENTEE": "Mail",
+           "PROVISIONAL": "Provisional", "FAILSAFE": "Provisional", "FAILSAFE PROVISIONAL": "Provisional"}
+
+
+def _sc_party(label):
+    u = (label or "").upper()
+    return "D" if "DEM" in u else "R" if "REP" in u else "O"
+
+
+def load_sc(year: int):
+    if year == 2026:
+        path = SC_RAW / "sc_2026_enr.json"
+        if not path.exists():
+            return None   # not exported yet — SC is built from 2024 only
+        out = []
+        for c in json.loads(path.read_text(encoding="utf-8")):
+            kind = dist = None
+            for rx, k in SC_CONTEST:
+                m = rx.match(c["title"])
+                if m:
+                    kind, dist = k, (int(m.group(1)) if m.groups() else 0)
+                    break
+            if not kind:
+                continue
+            cands = []
+            for name, p in zip(c["CH"], c["P"]):
+                n = re.sub(r"^(REP|DEM|NON|LIB|CON|WFM|GRN|ALN|UNA|IND|LAB|FWD)(/\w+)*\s+", "", name).strip()
+                cands.append((n or name, "O" if name.lower().startswith("write") else _sc_party(p), False))
+            county = c["county"].replace("_", " ").upper()
+            for pname, votes in zip(c["precincts"], c["V"]):
+                real = not SC_PSEUDO.search(pname)
+                for cand, v in zip(cands, votes):
+                    if v:
+                        out.append((county, pname.strip(), real, kind, dist, cand, {"all": int(v)}))
+        return out
+    # 2024 — MEDSL
+    path = SC_RAW / "sc24.csv"
+    if not path.exists():
+        z = _get("https://github.com/MEDSL/2024-elections-official/raw/main/individual_states/sc24.zip")
+        SC_RAW.mkdir(parents=True, exist_ok=True)
+        zipfile.ZipFile(io.BytesIO(z.content)).extractall(SC_RAW)
+    office = {"US PRESIDENT": "top", "STATE HOUSE": "house", "STATE SENATE": "senate"}
+    rows = [r for r in csv.DictReader(path.open(encoding="utf-8", errors="replace")) if r["office"] in office]
+    major = {}
+    for r in rows:
+        key = (r["office"], r["district"], r["candidate"])
+        p = {"DEMOCRAT": "D", "REPUBLICAN": "R"}.get(r["party_simplified"])
+        if p:
+            major[key] = p
+    agg = defaultdict(lambda: defaultdict(int))
+    for r in rows:
+        if r["candidate"].upper() in ("UNDERVOTES", "OVERVOTES"):
+            continue
+        meth = SC_MODE.get(r["mode"].upper())
+        v = int(float(r["votes"] or 0))
+        if not meth or not v:
+            continue
+        kind = office[r["office"]]
+        dist = int(r["district"]) if kind != "top" else 0
+        party = "O" if r["writein"] == "TRUE" else major.get((r["office"], r["district"], r["candidate"]), "O")
+        name = r["candidate"].title() if r["writein"] != "TRUE" else "Write-in"
+        pct = r["precinct"].strip()
+        agg[(r["county_name"].strip(), pct, not SC_PSEUDO.search(pct), kind, dist, (name, party, False))][meth] += v
+    return [(*k[:5], k[5], dict(by)) for k, by in agg.items()]
+
+
 # --------------------------------------------------------------------------- build
 def _total(by):
     return sum(by.values())
 
 
-def build(state: str, year: int, prec, exact_sorted=True):
+def build(state: str, year: int, prec, exact_sorted=True, unit_all=False):
     """-> {(chamber, dist): district-dict} for one year."""
     # unit -> chamber -> dist -> leg votes total ; unit -> top D/R ; precinct meta
     leg = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
@@ -399,6 +482,13 @@ def build(state: str, year: int, prec, exact_sorted=True):
         for (unit, m_), (td_, tr_) in top_unit_m[key].items():   # top votes with no leg votes
             if (unit, m_) not in unit_leg_m[key] and round(td_ + tr_):
                 units.append([unit[0], unit[1], m_, 0, 0, 0, round(td_), round(tr_)])
+        if unit_all:   # live feed reports precinct totals only (SC) → one row per precinct
+            merged = {}
+            for u in units:
+                m_ = merged.setdefault((u[0], u[1]), [u[0], u[1], "all", 0, 0, 0, 0, 0])
+                for i in range(3, 8):
+                    m_[i] += u[i]
+            units = list(merged.values())
         units.sort(key=lambda u: (u[0], u[1], u[2]))
         out[key] = {
             "units": units,
@@ -424,31 +514,64 @@ def ga_method_override(dist_data, meth_rows):
                              for m in METHODS if m in agg[key]]
 
 
+STATE_CFG = {
+    "GA": {"source": "Georgia Secretary of State results (results.sos.ga.gov), certified"},
+    "NC": {"source": "NC State Board of Elections results files (dl.ncsbe.gov)"},
+    "SC": {"source": "SC Election Commission results (enr-scvotes.org) for 2026; "
+                     "MIT Election Lab official precinct returns for 2024", "unit_all": True},
+}
+YEARS = (2024, 2026)
+
+
+def _load_year(state, year, notes):
+    cfg = STATE_CFG[state]
+    if state == "GA":
+        prec, meth = load_ga(year)
+        dd = build(state, year, prec)
+        ga_method_override(dd, meth)
+    elif state == "NC":
+        prec, exact = load_nc(year)
+        dd = build(state, year, prec, exact_sorted=exact)
+        if not exact:
+            notes.append(f"NC {year}: early/mail votes in multi-district counties are reported "
+                         "county-wide; the top-of-ticket split inside those districts is estimated "
+                         "until NCSBE posts its precinct-sorted file.")
+    else:
+        prec = load_sc(year)
+        if prec is None:
+            notes.append(f"SC {year} precinct results not loaded yet.")
+            return {}, TOP_LABEL[year]
+        dd = build(state, year, prec, unit_all=cfg.get("unit_all", False))
+    top = defaultdict(int)
+    for r in prec:
+        if r[3] == "top" and r[5][1] == "D":
+            top[r[5][0]] += _total(r[6])
+    top_name = max(top, key=top.get).split(" ")[-1].title() if top else TOP_LABEL[year]
+    return dd, top_name
+
+
 def write_state(state: str):
-    years = {}
-    notes = []
-    for year in (2024, 2026):
-        if state == "GA":
-            prec, meth = load_ga(year)
-            dd = build(state, year, prec)
-            ga_method_override(dd, meth)
-        else:
-            prec, exact = load_nc(year)
-            dd = build(state, year, prec, exact_sorted=exact)
-            if not exact:
-                notes.append(f"NC {year}: early/mail votes in multi-district counties are reported "
-                             "county-wide; the top-of-ticket split inside those districts is estimated "
-                             "until NCSBE posts its precinct-sorted file.")
-        years[year] = dd
-        print(f"{state} {year}: {len(dd)} districts")
+    years, top_names, notes = {}, {}, []
+    for year in YEARS:
+        years[year], top_names[str(year)] = _load_year(state, year, notes)
+        print(f"{state} {year}: {len(years[year])} districts")
+
+    # each chamber's latest REGULAR election = the year with the most districts
+    # (SC Senate: 2024 for all 46 seats; 2026 had one special election)
+    latest = {}
+    for ch in ("house", "senate"):
+        counts = {y: sum(1 for k in years[y] if k[0] == ch) for y in YEARS}
+        latest[ch] = max(YEARS, key=lambda y: (counts[y], y))
 
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / state).mkdir(exist_ok=True)
     rows = []
-    for key in sorted(set(years[2026]) | set(years[2024])):
+    base = {"house": {}, "senate": {}}
+    base_year = {"house": set(), "senate": set()}
+    for key in sorted(set().union(*[set(years[y]) for y in YEARS])):
         ch, dist = key
         row = {"chamber": ch, "district": dist}
-        for y in (2024, 2026):
+        for y in YEARS:
             dd = years[y].get(key)
             if dd:
                 row[str(y)] = {k: dd[k] for k in ("cands", "d", "r", "o", "total", "contested",
@@ -461,23 +584,26 @@ def write_state(state: str):
         rows.append(row)
         detail = {"state": state, "chamber": ch, "district": dist,
                   **{str(y): {k: v for k, v in years[y][key].items() if k != "units"}
-                     for y in (2024, 2026) if key in years[y]}}
+                     for y in YEARS if key in years[y]}}
         (OUT / state / f"{ch}-{dist}.json").write_text(json.dumps(detail, separators=(",", ":")))
-    # 2026 baseline for the election-night tracker, one file per chamber
+        # election-night baseline = this district's most recent election
+        y = max(y for y in YEARS if key in years[y])
+        base[ch][str(dist)] = years[y][key]["units"]
+        base_year[ch].add(y)
     for ch in ("house", "senate"):
-        base = {str(k[1]): v["units"] for k, v in years[2026].items() if k[0] == ch}
         (OUT / state / f"baseline-{ch}.json").write_text(json.dumps(
-            {"state": state, "chamber": ch, "year": 2026, "cols": ["county", "precinct", "method", "d", "r", "o", "td", "tr"],
-             "districts": base}, separators=(",", ":")))
+            {"state": state, "chamber": ch, "year": max(base_year[ch]) if base_year[ch] else None,
+             "years": sorted(base_year[ch]),
+             "cols": ["county", "precinct", "method", "d", "r", "o", "td", "tr"],
+             "districts": base[ch]}, separators=(",", ":")))
     meta = {"state": state, "built": date.today().isoformat(), "notes": notes,
-            "sources": ("Georgia Secretary of State results (results.sos.ga.gov), certified"
-                        if state == "GA" else "NC State Board of Elections results files (dl.ncsbe.gov)"),
-            "districts": rows}
+            "sources": STATE_CFG[state]["source"], "years": list(YEARS), "latest": latest,
+            "top_names": top_names, "districts": rows}
     (OUT / f"{state}.json").write_text(json.dumps(meta, separators=(",", ":")))
-    print(f"wrote ui/public/districts/{state}.json + {len(rows)} detail files")
+    print(f"wrote ui/public/districts/{state}.json + {len(rows)} detail files (latest {latest})")
 
 
 if __name__ == "__main__":
     which = (sys.argv[1] if len(sys.argv) > 1 else "ALL").upper()
-    for st in (["GA", "NC"] if which == "ALL" else [which]):
+    for st in (list(STATE_CFG) if which == "ALL" else [which]):
         write_state(st)
