@@ -4,7 +4,7 @@ import LiveView from './LiveView.jsx'
 
 // Static data built by ingestor/district_results.py → ui/public/districts/.
 // No backend call: these pages load instantly even when the Render API is asleep.
-const STATES = { GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina' }
+const STATES = { GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio' }
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
 // Dem top-of-ticket candidate per year (Ossoff / Cooper / Harris…), stored in the data by the builder
 const topNameOf = (data, year) => data?.top_names?.[String(year)] || TOP_RACE[year] || 'Top of ticket'
@@ -137,7 +137,10 @@ function DistrictTable({ st, data }) {
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState({ key: 'district', dir: 1 })
-  const prev = year === '2026' ? '2024' : null
+  const inYear = data.districts.filter((r) => r.chamber === chamber && r[year])
+  const chamberSize = data.districts.filter((r) => r.chamber === chamber).length
+  // staggered senates (OH): compare with 2024 only where most of this year's seats were also up then
+  const prev = year === '2026' && inYear.filter((r) => r['2024']).length * 2 >= inYear.length ? '2024' : null
   const topName = topNameOf(data, year)
 
   const rows = useMemo(() => {
@@ -191,7 +194,7 @@ function DistrictTable({ st, data }) {
 
       <div className="cards">
         <div className="panel card">
-          <div className="lbl">Seats won · {year}</div>
+          <div className="lbl">Seats won · {year}{inYear.length < chamberSize ? ` · ${inYear.length} of ${chamberSize} up` : ''}</div>
           <div className="big"><span className="d">{seats.D} D</span> · <span className="r">{seats.R} R</span>{seats.O ? <span className="muted"> · {seats.O} other</span> : null}</div>
           {prev && <div className="muted small">2024: {prevSeats.D} D · {prevSeats.R} R{prevSeats.O ? ` · ${prevSeats.O} other` : ''} ({seats.D - prevSeats.D >= 0 ? '+' : ''}{seats.D - prevSeats.D} D)</div>}
         </div>

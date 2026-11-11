@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { prepBaseline, projectAll, planReplay, replayAt, SCENARIOS, BATCHES } from '../src/districts/model.js'
 
 let bad = 0
-for (const st of ['GA', 'NC', 'SC']) for (const ch of ['house', 'senate']) {
+for (const st of ['GA', 'NC', 'SC', 'OH']) for (const ch of ['house', 'senate']) {
   const raw = JSON.parse(readFileSync(`public/districts/${st}/baseline-${ch}.json`)).districts
   const base = Object.fromEntries(Object.entries(raw).map(([d, r]) => [d, prepBaseline(r)]))
   for (const sc of Object.keys(SCENARIOS)) for (const seed of [1, 2, 3]) {

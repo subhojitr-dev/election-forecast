@@ -1,4 +1,15 @@
-# Next-session prompt — Election Forecast (NOV 3 READINESS)
+# Next-session prompt — Election Forecast
+
+> **UPDATE 2026-11-11 (supersedes the Nov 3 plan below — the forecast was NOT run on
+> election night).** New focus: **Districts tab for GA & NC legislature** — read
+> `DISTRICTS.md` first. DONE + deployed: 2026/2024 results + edge + 2028 targets for all
+> 406 seats; election-night tracker (practice replay of 2026 + live mode via
+> `/api/districts/live/{ST}`, poller tasks gated on `DISTRICT_LIVE_GA_EID` /
+> `DISTRICT_LIVE_NC_DATE`). TODO: (1) re-run `py ingestor/district_results.py NC` once
+> NCSBE posts the 2026 precinct-sorted file (late Nov); (2) test the live feed on the
+> next real GA special election (check GA precinct reportingStatus behaviour);
+> (3) optional: link the Districts tab from the early-vote /ga and /nc pages; more states.
+
 
 Paste the block below to start the next session.
 

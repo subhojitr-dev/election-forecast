@@ -10,7 +10,8 @@ const summary = JSON.parse(readFileSync(`public/districts/${st}.json`)).district
 let bad = 0, unmatched = 0, total = 0
 for (const ch of ['house', 'senate']) {
   const raw = JSON.parse(readFileSync(`public/districts/${st}/baseline-${ch}.json`)).districts
-  const base = Object.fromEntries(Object.entries(raw).map(([d, r]) => [d, prepBaseline(r)]))
+  // only the seats on the ballot (staggered senates: OH)
+  const base = Object.fromEntries(Object.entries(raw).filter(([d]) => payload.chambers[ch][d]).map(([d, r]) => [d, prepBaseline(r)]))
   const live = {}
   for (const [d, x] of Object.entries(payload.chambers[ch])) {
     const units = {}

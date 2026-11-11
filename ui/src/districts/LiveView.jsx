@@ -6,7 +6,7 @@ import { getDistrictLive } from '../api.js'
 //   Practice: replays 2026 in the browser (no backend), optionally with a swing.
 //   Live:     polls /api/districts/live/{ST} (filled by the production poller).
 const CHAMBERS = { house: 'State House', senate: 'State Senate' }
-const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 }, SC: { house: 124, senate: 46 } }
+const SEATS = { GA: { house: 180, senate: 56 }, NC: { house: 120, senate: 50 }, SC: { house: 124, senate: 46 }, OH: { house: 99, senate: 33 } }
 const POLL_MS = 30000
 
 const num = (x) => (x == null ? '—' : Math.round(x).toLocaleString())
@@ -60,6 +60,7 @@ export default function LiveView({ st, chamber, district, summary }) {
   const [mode, setMode] = useState('practice')
   const [raw, setRaw] = useState(null)
   const [baseYear, setBaseYear] = useState(null)
+  const [fullRaw, setFullRaw] = useState(null)
   const [err, setErr] = useState(null)
   const [scenario, setScenario] = useState('random')
   const [batch, setBatch] = useState(0)
@@ -70,7 +71,13 @@ export default function LiveView({ st, chamber, district, summary }) {
 
   useEffect(() => {
     setRaw(null); setErr(null)
-    loadBase(st, chamber).then((b) => { setRaw(b.districts); setBaseYear(b.year) }, (e) => setErr(e.message))
+    loadBase(st, chamber).then((b) => {
+      // staggered senates (OH): practice replays only the seats that were up in the latest election
+      const dy = b.dist_year || {}
+      setRaw(Object.fromEntries(Object.entries(b.districts).filter(([d]) => !dy[d] || dy[d] === b.year)))
+      setFullRaw(b.districts)
+      setBaseYear(b.year)
+    }, (e) => setErr(e.message))
   }, [st, chamber])
 
   useEffect(() => { setBatch(0); setPlaying(false) }, [st, scenario])
@@ -93,7 +100,15 @@ export default function LiveView({ st, chamber, district, summary }) {
     return () => { alive = false; clearInterval(id) }
   }, [mode, st])
 
-  const base = useMemo(() => raw && Object.fromEntries(Object.entries(raw).map(([d, r]) => [d, prepBaseline(r)])), [raw])
+  // live: project only the seats on the ballot (those the feed reports); practice: the replayed seats
+  const base = useMemo(() => {
+    const src = mode === 'live' && livePayload ? fullRaw : raw
+    if (!src) return null
+    const up = mode === 'live' && livePayload ? livePayload.chambers?.[chamber] : null
+    return Object.fromEntries(Object.entries(src)
+      .filter(([d]) => !up || !Object.keys(up).length || up[d])
+      .map(([d, r]) => [d, prepBaseline(r)]))
+  }, [raw, fullRaw, mode, livePayload, chamber])
   const plan = useMemo(() => raw && planReplay(st, raw, scenario, 11), [raw, st, scenario])
 
   // real 2026 candidate names for practice mode
@@ -115,6 +130,17 @@ export default function LiveView({ st, chamber, district, summary }) {
   }, [plan, mode, batch, livePayload, chamber, names])
 
   const proj = useMemo(() => base && live && projectAll(base, live), [base, live])
+  // seats not on the ballot this time (staggered senates) keep their current holder
+  const hold = useMemo(() => {
+    const h = { D: 0, R: 0, O: 0 }
+    if (!proj) return h
+    for (const r of summary.districts) {
+      if (r.chamber !== chamber || proj.districts[r.district]) continue
+      const y = r['2026'] || r['2024']
+      if (y?.cands?.length) h[y.cands[0].party]++
+    }
+    return h
+  }, [proj, summary, chamber])
 
   if (err) return <div className="err">{err}</div>
   if (!proj) return <div className="panel muted">Loading the baseline…</div>
@@ -162,7 +188,7 @@ export default function LiveView({ st, chamber, district, summary }) {
       {district
         ? <LiveDistrict baseYear={baseYear} st={st} chamber={chamber} x={proj.districts[district]} pinned={pins.includes(`${chamber}-${district}`)}
                         onPin={() => togglePin(`${chamber}-${district}`)} practice={mode === 'practice'} plan={plan} />
-        : <LiveTable baseYear={baseYear} st={st} chamber={chamber} proj={proj} pins={pins} togglePin={togglePin}
+        : <LiveTable baseYear={baseYear} st={st} chamber={chamber} proj={proj} pins={pins} togglePin={togglePin} hold={hold}
                      practice={mode === 'practice'} plan={plan} batch={batch} />}
     </>
   )
@@ -182,14 +208,15 @@ function Status({ s }) {
   return <span className={`status ${s.tier} ${s.party === 'D' ? 'd' : s.party === 'R' ? 'r' : ''}`}>{s.label}</span>
 }
 
-function LiveTable({ baseYear, st, chamber, proj, pins, togglePin, practice, plan, batch }) {
+function LiveTable({ baseYear, st, chamber, proj, pins, togglePin, practice, plan, batch, hold }) {
   const [sort, setSort] = useState('close')
   const [q, setQ] = useState('')
   const rows = Object.values(proj.districts)
   const seats = SEATS[st][chamber]
   const majority = Math.floor(seats / 2) + 1
-  const projD = rows.filter((x) => x.status.party === 'D').length
-  const projO = rows.filter((x) => x.status.party === 'O').length
+  const projD = rows.filter((x) => x.status.party === 'D').length + hold.D
+  const projO = rows.filter((x) => x.status.party === 'O').length + hold.O
+  const held = hold.D + hold.R + hold.O
   const expD = rows.reduce((s, x) => s + x.pD, 0)
   const tossups = rows.filter((x) => x.status.tier === 'tossup').length
   const counted = rows.reduce((s, x) => s + x.counted.d + x.counted.r, 0)
@@ -228,7 +255,8 @@ function LiveTable({ baseYear, st, chamber, proj, pins, togglePin, practice, pla
         <div className="panel card">
           <div className="lbl">Projected seats · majority {majority}</div>
           <div className="big"><span className="d">{projD} D</span> · <span className="r">{seats - projD - projO} R</span>{projO ? <span className="muted"> · {projO} other</span> : null}</div>
-          <div className="muted small">Expected Dem seats {expD.toFixed(1)} · {projD >= majority ? 'Dem majority' : 'Rep majority'} projected</div>
+          <div className="muted small">Expected Dem seats {(expD + hold.D).toFixed(1)} · {projD >= majority ? 'Dem majority' : 'Rep majority'} projected
+            {held ? ` · incl. ${held} seats not up (${hold.D} D, ${hold.R} R)` : ''}</div>
         </div>
         <div className="panel card">
           <div className="lbl">Swing vs {baseYear} (counted precincts)</div>
@@ -310,7 +338,7 @@ function LiveDistrict({ baseYear, st, chamber, x, pinned, onPin, practice, plan 
   const remShare = remaining ? remD / remaining : null
   const truth = practice ? plan?.[x.dist]?.trueSwing : null
   const cands = x.cands.slice().sort((a, b) => (b.votes || 0) - (a.votes || 0))
-  const label = `${{ GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina' }[st]} ${CHAMBERS[chamber]} District ${x.dist}`
+  const label = `${{ GA: 'Georgia', NC: 'North Carolina', SC: 'South Carolina', OH: 'Ohio' }[st]} ${CHAMBERS[chamber]} District ${x.dist}`
 
   return (
     <div className="detail">

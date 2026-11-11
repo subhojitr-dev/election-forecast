@@ -25,7 +25,7 @@ export default function Root() {
     <>
       <nav className="tabs-top">
         <a href="#/" className={onDistricts ? '' : 'on'}>Statewide</a>
-        <a href="#/districts/GA" className={onDistricts ? 'on' : ''}>Districts · GA, NC &amp; SC</a>
+        <a href="#/districts/GA" className={onDistricts ? 'on' : ''}>Districts · GA, NC, SC &amp; OH</a>
       </nav>
       {onDistricts ? <Districts parts={parts.slice(1)} /> : <App />}
     </>

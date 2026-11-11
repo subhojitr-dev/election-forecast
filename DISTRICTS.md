@@ -1,4 +1,4 @@
-# Districts tab — GA, NC & SC legislature
+# Districts tab — GA, NC, SC & OH legislature
 
 App: https://election-forecast-silk.vercel.app/#/districts/GA  (and `/NC`)
 
@@ -71,3 +71,23 @@ next live GA special election (GA holds several a year) and adjust `GA_DONE_STAT
 - **Senate** baseline stays 2024 (next regular SC Senate election is 2028).
 - **Live:** `DISTRICT_LIVE_SC_EID` → `district_live_feed.fetch_sc`. ⚠️ Blocked to scripts as of
   Nov 2026 (open in July 2026) — re-test before a live night; if still blocked, SC is practice-only.
+
+## Ohio
+
+- **2024** (99 House + 17 even-numbered Senate seats, plus SD-33): MIT Election Lab official
+  precinct file (`oh24.zip`). Validated: House 65 R–34 D; Harris/Trump exact.
+- **2026** (99 House + 17 odd Senate seats): Ohio SoS election-night XML
+  (`liveresults.ohiosos.gov/Api/v1/download?filename=VSSC1622XmlFileBlob`), saved as
+  `data/raw/districts/oh/oh_2026.xml`. It reports every race **by county only** (the
+  precinct link is disabled), so 2026 units are county × district. In counties shared by
+  several districts, the US Senate vote is split by each district's 2024 Harris share
+  there (flagged "estimated"). Validated: Brown 2,301,042 / Husted 2,077,748 exact.
+  Result: House 43 D – 56 R (+9 D); Senate 8 D – 9 R of the 17 seats up.
+  Unofficial: ~102k absentee/provisional ballots were still outstanding on Nov 11. Re-pull
+  (delete the xml, re-run `py ingestor/district_results.py OH`) after the canvass, and switch
+  to the official precinct file once the SoS posts it (~December).
+- **Staggered Senate:** half the seats are up each cycle. Results show "17 of 33 up";
+  election night projects only the seats in the feed and counts holdovers toward the majority.
+- **Election night** is county-level (as Ohio reports): `DISTRICT_LIVE_OH=1` →
+  `district_live_feed.fetch_oh` (one XML every 2 min). A county counts as in when its
+  precincts are all reported.

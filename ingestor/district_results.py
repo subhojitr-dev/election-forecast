@@ -22,7 +22,7 @@ Sources (all official, public, no login):
 Edge = legislative two-party margin minus top-of-ticket margin in the same district:
 positive = the Democratic legislative candidate ran AHEAD of the top of the ticket.
 
-Usage:  py ingestor/district_results.py [GA|NC|ALL]
+Usage:  py ingestor/district_results.py [GA|NC|SC|OH|ALL]
 """
 from __future__ import annotations
 
@@ -351,12 +351,122 @@ def load_sc(year: int):
     return [(*k[:5], k[5], dict(by)) for k, by in agg.items()]
 
 
+# --------------------------------------------------------------------------- OH
+# 2026: Ohio Secretary of State election-night results (liveresults.ohiosos.gov), NIST
+#       1500-100 XML: every contest by COUNTY (the precinct section is empty) - so 2026
+#       units are county x district. Saved to data/raw/districts/oh/oh_2026.xml.
+#       The official precinct file follows certification (~Dec); swap it in then.
+# 2024: MIT Election Lab official precinct file (MEDSL individual_states/oh24.zip).
+# The top-of-ticket split inside counties shared by several districts is estimated from
+# each district's 2024 Harris share in that county, else its own legislative share.
+OH_RAW = RAW / "oh"
+OH_XML = "https://liveresults.ohiosos.gov/Api/v1/download?filename=VSSC1622XmlFileBlob"
+OH_CONTEST = [
+    (re.compile(r"^U\.S\. Senator$"), "top"),
+    (re.compile(r"^State Representative - District (\d+)$"), "house"),
+    (re.compile(r"^State Senator - District (\d+)$"), "senate"),
+]
+
+
+def parse_oh_xml(text):
+    """-> [(county, kind, dist, (name, party, inc), votes, county_done)]"""
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(text)
+    ns = root.tag.split("}")[0] + "}"
+
+    def lang(el):
+        return "".join(el.itertext()).strip() if el is not None else ""
+
+    counties = {}
+    for g in root.iter(ns + "GpUnit"):
+        if g.get("Type") == "County":
+            st = g.find(ns + "CountStatus")
+            done = (st is not None and st.get("Status") == "Completed") or (
+                g.get("TotalSubUnits") and g.get("SubUnitsReported") == g.get("TotalSubUnits"))
+            counties[g.get("ObjectId")] = (g.get("Name").upper(), bool(done))
+    party = {x.get("ObjectId"): (x.get("Abbreviation") or "").upper() for x in root.iter(ns + "Party")}
+    cand = {c.get("ObjectId"): (lang(c.find(ns + "BallotName")),
+                                {"DEM": "D", "REP": "R"}.get(party.get(c.findtext(ns + "PartyId"), ""), "O"))
+            for c in root.iter(ns + "Candidate")}
+    out = []
+    for c in root.iter(ns + "Contest"):
+        title = (c.get("Name") or "").strip()
+        kind = dist = None
+        for rx, k in OH_CONTEST:
+            m = rx.match(title)
+            if m:
+                kind, dist = k, (int(m.group(1)) if m.groups() else 0)
+                break
+        if not kind:
+            continue
+        for bs in c.iter(ns + "BallotSelection"):
+            name, pty = cand.get(bs.findtext(ns + "CandidateId"), ("Write-in", "O"))
+            if bs.get("IsWriteIn") == "true":
+                name, pty = "Write-in", "O"
+            for vc in bs.iter(ns + "VoteCounts"):
+                cty = counties.get(vc.findtext(ns + "GpUnitId"))
+                if cty:
+                    out.append((cty[0], kind, dist, (name, pty, False), int(vc.get("Count") or 0), cty[1]))
+    return out
+
+
+def load_oh(year: int):
+    if year == 2026:
+        path = OH_RAW / "oh_2026.xml"
+        if not path.exists():
+            OH_RAW.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(_get(OH_XML).content)
+        rows = parse_oh_xml(path.read_text(encoding="utf-8"))
+        return [(county, "ALL", False, kind, dist, cand, {"all": v})
+                for county, kind, dist, cand, v, _ in rows if v]
+    path = OH_RAW / "oh24.csv"
+    if not path.exists():
+        z = _get("https://github.com/MEDSL/2024-elections-official/raw/main/individual_states/oh24.zip")
+        OH_RAW.mkdir(parents=True, exist_ok=True)
+        zipfile.ZipFile(io.BytesIO(z.content)).extractall(OH_RAW)
+    office = {"US PRESIDENT": "top", "STATE HOUSE": "house", "STATE SENATE": "senate"}
+    agg = defaultdict(int)
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for r in csv.DictReader(f):
+            kind = office.get(r["office"])
+            if not kind or r["candidate"].upper() in ("UNDERVOTES", "OVERVOTES"):
+                continue
+            v = int(float(r["votes"] or 0))
+            if not v:
+                continue
+            wi = r["writein"] == "TRUE"
+            party = "O" if wi else {"DEMOCRAT": "D", "REPUBLICAN": "R"}.get(r["party_simplified"], "O")
+            name = "Write-in" if wi else r["candidate"].title()
+            dist = int(r["district"]) if kind != "top" else 0
+            agg[(r["county_name"].strip(), r["precinct"].strip(), kind, dist, (name, party, False))] += v
+    return [(c, p_, True, k, d, cand, {"all": v}) for (c, p_, k, d, cand), v in agg.items()]
+
+
+def oh_lean_prior(prec24):
+    """(county, chamber, dist) -> [Harris, Trump] in that district's 2024 precincts."""
+    top = defaultdict(lambda: [0, 0])
+    where = defaultdict(set)
+    for county, pct, real, kind, dist, cand, by in prec24:
+        if kind == "top":
+            if cand[1] in "DR":
+                top[(county, pct)]["DR".index(cand[1])] += _total(by)
+        else:
+            where[(county, pct)].add((kind, dist))
+    lean = defaultdict(lambda: [0, 0])
+    for u, ds in where.items():
+        for kind, dist in ds:
+            lean[(u[0], kind, dist)][0] += top[u][0]
+            lean[(u[0], kind, dist)][1] += top[u][1]
+    return lean
+
+
 # --------------------------------------------------------------------------- build
 def _total(by):
     return sum(by.values())
 
 
-def build(state: str, year: int, prec, exact_sorted=True, unit_all=False):
+def build(state: str, year: int, prec, exact_sorted=True, unit_all=False,
+          unit_county=False, lean_prior=None):
     """-> {(chamber, dist): district-dict} for one year."""
     # unit -> chamber -> dist -> leg votes total ; unit -> top D/R ; precinct meta
     leg = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
@@ -411,6 +521,10 @@ def build(state: str, year: int, prec, exact_sorted=True, unit_all=False):
                 p = {}
                 for d in ds:
                     ld, lr = real_lean.get((unit[0], ch, d), (0, 0))
+                    if not (ld + lr) and lean_prior:
+                        ld, lr = lean_prior.get((unit[0], ch, d), (0, 0))
+                    if not (ld + lr):   # fall back to the district's own legislative lean here
+                        ld, lr = unit_leg[(ch, d)][unit][:2]
                     p[d] = ld / (ld + lr) if (ld + lr) else 0.5
                 wd = {d: ds[d] * p[d] for d in ds}
                 wr = {d: ds[d] * (1 - p[d]) for d in ds}
@@ -482,10 +596,11 @@ def build(state: str, year: int, prec, exact_sorted=True, unit_all=False):
         for (unit, m_), (td_, tr_) in top_unit_m[key].items():   # top votes with no leg votes
             if (unit, m_) not in unit_leg_m[key] and round(td_ + tr_):
                 units.append([unit[0], unit[1], m_, 0, 0, 0, round(td_), round(tr_)])
-        if unit_all:   # live feed reports precinct totals only (SC) → one row per precinct
+        if unit_all or unit_county:   # live feed reports precinct (SC) / county (OH) totals only
             merged = {}
             for u in units:
-                m_ = merged.setdefault((u[0], u[1]), [u[0], u[1], "all", 0, 0, 0, 0, 0])
+                k_ = (u[0], "ALL") if unit_county else (u[0], u[1])
+                m_ = merged.setdefault(k_, [k_[0], k_[1], "all", 0, 0, 0, 0, 0])
                 for i in range(3, 8):
                     m_[i] += u[i]
             units = list(merged.values())
@@ -496,7 +611,7 @@ def build(state: str, year: int, prec, exact_sorted=True, unit_all=False):
             "contested": contested, "margin": m,
             "top": {"label": TOP_LABEL[year], "d": round(tD), "r": round(tR), "margin": tm},
             "edge": round(m - tm, 4) if (m is not None and tm is not None) else None,
-            "est_share": round(est / (tD + tR), 3) if (tD + tR) and not exact_sorted else 0,
+            "est_share": min(1.0, round(est / (tD + tR), 3)) if (tD + tR) and not exact_sorted else 0,
             "counties": counties, "methods": methods, "precincts": precincts,
         }
     return out
@@ -519,6 +634,8 @@ STATE_CFG = {
     "NC": {"source": "NC State Board of Elections results files (dl.ncsbe.gov)"},
     "SC": {"source": "SC Election Commission results (enr-scvotes.org) for 2026; "
                      "MIT Election Lab official precinct returns for 2024", "unit_all": True},
+    "OH": {"source": "Ohio Secretary of State results (liveresults.ohiosos.gov) for 2026, by county; "
+                     "MIT Election Lab official precinct returns for 2024"},
 }
 YEARS = (2024, 2026)
 
@@ -536,6 +653,14 @@ def _load_year(state, year, notes):
             notes.append(f"NC {year}: early/mail votes in multi-district counties are reported "
                          "county-wide; the top-of-ticket split inside those districts is estimated "
                          "until NCSBE posts its precinct-sorted file.")
+    elif state == "OH":
+        prec = load_oh(year)
+        prior = oh_lean_prior(load_oh(2024)) if year == 2026 else None
+        dd = build(state, year, prec, exact_sorted=(year != 2026), unit_county=True, lean_prior=prior)
+        if year == 2026:
+            notes.append("OH 2026: Ohio reports legislative results by county until certification. "
+                         "In counties shared by several districts, the US Senate vote is split by each "
+                         "district's 2024 lean there (estimated).")
     else:
         prec = load_sc(year)
         if prec is None:
@@ -568,6 +693,7 @@ def write_state(state: str):
     rows = []
     base = {"house": {}, "senate": {}}
     base_year = {"house": set(), "senate": set()}
+    dist_year = {"house": {}, "senate": {}}
     for key in sorted(set().union(*[set(years[y]) for y in YEARS])):
         ch, dist = key
         row = {"chamber": ch, "district": dist}
@@ -590,10 +716,11 @@ def write_state(state: str):
         y = max(y for y in YEARS if key in years[y])
         base[ch][str(dist)] = years[y][key]["units"]
         base_year[ch].add(y)
+        dist_year[ch][str(dist)] = y
     for ch in ("house", "senate"):
         (OUT / state / f"baseline-{ch}.json").write_text(json.dumps(
             {"state": state, "chamber": ch, "year": max(base_year[ch]) if base_year[ch] else None,
-             "years": sorted(base_year[ch]),
+             "years": sorted(base_year[ch]), "dist_year": dist_year[ch],
              "cols": ["county", "precinct", "method", "d", "r", "o", "td", "tr"],
              "districts": base[ch]}, separators=(",", ":")))
     meta = {"state": state, "built": date.today().isoformat(), "notes": notes,

@@ -22,10 +22,14 @@ Configure an election (Render → Environment), then the production poller picks
   DISTRICT_LIVE_GA_EID = e.g. 11072028GeneralElection   (from results.sos.ga.gov/results/public/Georgia)
   DISTRICT_LIVE_NC_DATE = e.g. 2028-11-07                (NCSBE ENRS folder date)
   DISTRICT_LIVE_SC_EID = e.g. 127300                     (enr-scvotes.org election id)
+  DISTRICT_LIVE_OH = 1                                   (Ohio SoS XML feed; one fixed URL, current election)
+                     OH reports by COUNTY only: a unit = county x district, done when the county
+                     reports all its precincts (CountStatus Completed).
 
 CLI:
   py ingestor/district_live_feed.py GA <eid>          one poll → DB
   py ingestor/district_live_feed.py NC <yyyy-mm-dd>   one poll → DB
+  py ingestor/district_live_feed.py OH                one poll → DB
   py ingestor/district_live_feed.py clear [GA|NC]     remove stored snapshots
 """
 from __future__ import annotations
@@ -44,8 +48,8 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import re  # noqa: E402
 
-from district_results import (GA_API, GA_CONTEST, NC_S3, SC_CONTEST, _ga_cand, _get,  # noqa: E402
-                              _nc_kind, _party, _sc_party, _txt)
+from district_results import (GA_API, GA_CONTEST, NC_S3, OH_XML, SC_CONTEST, _ga_cand, _get,  # noqa: E402
+                              _nc_kind, _party, _sc_party, _txt, parse_oh_xml)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(ROOT, "data", "db", "baseline.db")
@@ -204,6 +208,22 @@ def fetch_sc(eid: str, workers: int = 4):
     return _finish("SC", f"South Carolina {eid}", chambers)
 
 
+# --------------------------------------------------------------------------- OH
+def fetch_oh():
+    r = _get(OH_XML)
+    if r is None:
+        raise RuntimeError("OH results feed not available")
+    chambers = _empty()
+    for county, kind, dist, cand, v, done in parse_oh_xml(r.text):
+        if kind not in ("house", "senate"):
+            continue
+        ch = chambers[kind][dist]
+        ch["cands"][(cand[0], cand[1])] += 0       # list every candidate even at 0 votes
+        _add(ch, county, "ALL", "all", cand, v, done)
+    m = re.search(r'GeneratedDate="([^"]+)"', r.text[:2000])
+    return _finish("OH", f"Ohio results feed {m.group(1) if m else ''}".strip(), chambers)
+
+
 # --------------------------------------------------------------------------- store
 def store(payload, db_path=DB):
     con = sqlite3.connect(db_path)
@@ -240,6 +260,10 @@ def poll_sc():
     return store(fetch_sc(os.environ["DISTRICT_LIVE_SC_EID"]))
 
 
+def poll_oh():
+    return store(fetch_oh())
+
+
 def poll_nc():
     return store(fetch_nc(os.environ["DISTRICT_LIVE_NC_DATE"]))
 
@@ -252,6 +276,8 @@ if __name__ == "__main__":
         print(store(fetch_sc(sys.argv[2])))
     elif cmd == "NC":
         print(store(fetch_nc(sys.argv[2])))
+    elif cmd == "OH":
+        print(store(fetch_oh()))
     elif cmd == "CLEAR":
         clear(sys.argv[2].upper() if len(sys.argv) > 2 else None)
         print("cleared")
