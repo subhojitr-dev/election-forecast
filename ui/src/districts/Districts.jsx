@@ -44,12 +44,15 @@ function Candidates({ y }) {
   for (const p of ['D', 'R']) { const c = shown.find((x) => x.party === p); if (c) pick.push(c) }
   for (const c of shown) if (c.party === 'O') pick.push(c)
   pick.sort((a, b) => b.votes - a.votes)
+  // within 1 pt: may still be in a recount (SC: automatic under 1%) — don't show a final ✓
+  const close = y.contested && y.margin != null && Math.abs(y.margin) < 0.01
   return (
     <div className="cand-list">
       {pick.map((c) => (
         <div key={c.party + c.name} className={c.win ? 'cand win' : 'cand'}>
           <span className={`pill ${c.party === 'D' ? 'd' : c.party === 'R' ? 'r' : ''}`}>{PARTY[c.party]}</span>{' '}
-          {c.win ? '✓ ' : ''}{c.name}{c.inc ? <span className="muted tiny"> (inc.)</span> : null}
+          {c.win && !close ? '✓ ' : ''}{c.name}{c.inc ? <span className="muted tiny"> (inc.)</span> : null}
+          {c.win && close ? <span className="flag">leads · within 1 pt</span> : null}
         </div>
       ))}
       {!y.cands.some((c) => c.party === 'D') && <div className="cand muted tiny">No Democrat ran</div>}
